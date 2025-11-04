@@ -111,8 +111,8 @@ export default function Home() {
       </section>
 
       {/* About Section */}
-      <section className="border-t bg-muted/30">
-        <div className="container mx-auto px-4 py-16 md:py-24">
+      <section className="border-t bg-muted/30 relative">
+        <div className="container mx-auto px-4 py-16 md:py-24 relative z-10">
           <Card className="max-w-4xl mx-auto">
             <CardContent className="p-8 md:p-12">
               <div className="text-center space-y-6">
@@ -133,6 +133,37 @@ export default function Home() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Rolling Hills Footer */}
+        <div className="relative w-full h-64 overflow-hidden">
+          <svg
+            className="absolute bottom-0 w-full h-full"
+            viewBox="0 0 1200 200"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Far hill */}
+            <path
+              d="M0,150 Q300,100 600,150 T1200,150 L1200,200 L0,200 Z"
+              fill="#7cb342"
+              className="dark:fill-field-green/60"
+              opacity="0.6"
+            />
+            {/* Near hill */}
+            <path
+              d="M0,180 Q400,120 800,180 T1200,180 L1200,200 L0,200 Z"
+              fill="#aed581"
+              className="dark:fill-field-light/80"
+              opacity="0.8"
+            />
+            {/* Grass */}
+            <path
+              d="M0,200 Q400,180 800,200 T1200,200 L1200,200 L0,200 Z"
+              fill="#558b2f"
+              className="dark:fill-field-dark"
+            />
+          </svg>
         </div>
       </section>
     </main>
