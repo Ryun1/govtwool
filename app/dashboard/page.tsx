@@ -1,7 +1,7 @@
 import { getDRepsPage, getGovernanceActionsPage } from '@/lib/governance';
-import { calculateStats } from '@/lib/governance-stats';
-import DashboardStats from '@/components/DashboardStats';
-import { ActionTimeline } from '@/components/ActionTimeline';
+import { calculateStats } from '@/lib/governance/governance-stats';
+import DashboardStats from '@/components/features/DashboardStats';
+import { ActionTimeline } from '@/components/features/ActionTimeline';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import ActionList from '@/components/features/ActionList';
 import DRepList from '@/components/features/DRepList';
@@ -11,11 +11,11 @@ import { ArrowRight, TrendingUp, Users, FileText, Vote } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Lazy load heavy chart components (client components will hydrate on client)
-const VotingPowerFlowLazy = dynamic(() => import('@/components/VotingPowerFlow').then(mod => ({ default: mod.VotingPowerFlow })), {
+const VotingPowerFlowLazy = dynamic(() => import('@/components/charts/VotingPowerFlow').then(mod => ({ default: mod.VotingPowerFlow })), {
   loading: () => <div className="h-64 flex items-center justify-center text-muted-foreground">Loading chart...</div>,
 });
 
-const GovernanceHeatmapLazy = dynamic(() => import('@/components/GovernanceHeatmap').then(mod => ({ default: mod.GovernanceHeatmap })), {
+const GovernanceHeatmapLazy = dynamic(() => import('@/components/charts/GovernanceHeatmap').then(mod => ({ default: mod.GovernanceHeatmap })), {
   loading: () => <div className="h-64 flex items-center justify-center text-muted-foreground">Loading heatmap...</div>,
 });
 

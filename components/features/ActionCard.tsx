@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { memo } from 'react';
-import { Card, CardContent, CardHeader } from './ui/Card';
-import { Badge } from './ui/Badge';
+import { Card, CardContent, CardHeader } from '../ui/Card';
+import { Badge } from '../ui/Badge';
 import { Clock, TrendingUp, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 import type { GovernanceAction } from '@/types/governance';
 
