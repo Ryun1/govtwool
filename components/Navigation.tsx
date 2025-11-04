@@ -1,20 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { WalletConnect } from './WalletConnect';
 import { ThemeToggle } from './ThemeToggle';
+import { Button } from './ui/Button';
+import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/dreps', label: 'DReps' },
-    { href: '/actions', label: 'Actions' },
-    { href: '/delegate', label: 'Delegate' },
-    { href: '/register-drep', label: 'Register' },
+    { href: '/', label: 'Home', icon: '🏠' },
+    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { href: '/dreps', label: 'DReps', icon: '👥' },
+    { href: '/actions', label: 'Actions', icon: '📋' },
+    { href: '/delegate', label: 'Delegate', icon: '🗳️' },
+    { href: '/register-drep', label: 'Register', icon: '➕' },
   ];
 
   return (
@@ -29,6 +34,7 @@ export default function Navigation() {
           </Link>
           
           <div className="flex items-center gap-6">
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-4">
               {navLinks.map((link) => (
                 <Link
@@ -45,12 +51,59 @@ export default function Navigation() {
                 </Link>
               ))}
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Mobile Menu Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </Button>
+
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-3">
               <ThemeToggle />
               <WalletConnect />
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t">
+            <div className="px-2 pt-2 pb-3 space-y-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    pathname === link.href
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <span>{link.icon}</span>
+                  <span>{link.label}</span>
+                </Link>
+              ))}
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <ThemeToggle />
+                <div className="flex-1">
+                  <WalletConnect />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );

@@ -41,26 +41,19 @@ export default function DRepsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">DReps Directory</h1>
+      <h1 className="text-4xl font-display font-bold text-foreground mb-8">DReps Directory</h1>
       {allDReps.length > 0 && (
         <div className="mb-8">
           <VotingPowerFlow dreps={allDReps} />
         </div>
       )}
-      {loading && currentPage === 1 ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-field-green"></div>
-          <p className="mt-4 text-gray-600">Loading DReps...</p>
-        </div>
-      ) : (
-        <DRepList 
-          dreps={dreps} 
-          currentPage={currentPage}
-          hasMore={hasMore}
-          onPageChange={setCurrentPage}
-          loading={loading}
-        />
-      )}
+      <DRepList 
+        dreps={dreps} 
+        currentPage={currentPage}
+        hasMore={hasMore}
+        onPageChange={setCurrentPage}
+        loading={loading && currentPage === 1}
+      />
     </div>
   );
 }

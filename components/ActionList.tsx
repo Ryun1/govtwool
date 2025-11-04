@@ -2,14 +2,17 @@
 
 import { useState, useMemo } from 'react';
 import ActionCard from './ActionCard';
+import { ActionCardSkeleton } from './ui/CardSkeleton';
 import { Search, Filter } from 'lucide-react';
 import type { GovernanceAction } from '@/types/governance';
+import { cn } from '@/lib/utils';
 
 interface ActionListProps {
   actions: GovernanceAction[];
+  loading?: boolean;
 }
 
-export default function ActionList({ actions }: ActionListProps) {
+export default function ActionList({ actions, loading = false }: ActionListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -35,13 +38,18 @@ export default function ActionList({ actions }: ActionListProps) {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
           <input
             type="text"
             placeholder="Search actions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-field-green focus:border-transparent"
+            className={cn(
+              "w-full pl-10 pr-4 py-2 border border-input rounded-md",
+              "bg-background text-foreground",
+              "focus:ring-2 focus:ring-ring focus:border-transparent",
+              "placeholder:text-muted-foreground"
+            )}
           />
         </div>
         
@@ -49,7 +57,11 @@ export default function ActionList({ actions }: ActionListProps) {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-field-green focus:border-transparent"
+            className={cn(
+              "px-4 py-2 border border-input rounded-md",
+              "bg-background text-foreground",
+              "focus:ring-2 focus:ring-ring focus:border-transparent"
+            )}
           >
             {statuses.map((status) => (
               <option key={status} value={status}>
@@ -61,7 +73,11 @@ export default function ActionList({ actions }: ActionListProps) {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-field-green focus:border-transparent"
+            className={cn(
+              "px-4 py-2 border border-input rounded-md",
+              "bg-background text-foreground",
+              "focus:ring-2 focus:ring-ring focus:border-transparent"
+            )}
           >
             {types.map((type) => (
               <option key={type} value={type}>
@@ -73,12 +89,17 @@ export default function ActionList({ actions }: ActionListProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.length > 0 ? (
+        {loading ? (
+          // Show skeletons while loading
+          Array.from({ length: 6 }).map((_, i) => (
+            <ActionCardSkeleton key={i} />
+          ))
+        ) : filtered.length > 0 ? (
           filtered.map((action) => (
             <ActionCard key={action.action_id} action={action} />
           ))
         ) : (
-          <div className="col-span-full text-center py-12 text-gray-500">
+          <div className="col-span-full text-center py-12 text-muted-foreground">
             No actions found matching your criteria
           </div>
         )}

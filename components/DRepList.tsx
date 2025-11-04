@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from 'react';
 import DRepCard from './DRepCard';
+import { DRepCardSkeleton } from './ui/CardSkeleton';
 import { Button } from './ui/Button';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DRep } from '@/types/governance';
+import { cn } from '@/lib/utils';
 
 interface DRepListProps {
   dreps: DRep[];
@@ -56,13 +58,18 @@ export default function DRepList({
     <div>
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
           <input
             type="text"
             placeholder="Search DReps..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-field-green focus:border-transparent"
+            className={cn(
+              "w-full pl-10 pr-4 py-2 border border-input rounded-md",
+              "bg-background text-foreground",
+              "focus:ring-2 focus:ring-ring focus:border-transparent",
+              "placeholder:text-muted-foreground"
+            )}
           />
         </div>
         
@@ -70,7 +77,11 @@ export default function DRepList({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-field-green focus:border-transparent"
+            className={cn(
+              "px-4 py-2 border border-input rounded-md",
+              "bg-background text-foreground",
+              "focus:ring-2 focus:ring-ring focus:border-transparent"
+            )}
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -81,7 +92,11 @@ export default function DRepList({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-field-green focus:border-transparent"
+            className={cn(
+              "px-4 py-2 border border-input rounded-md",
+              "bg-background text-foreground",
+              "focus:ring-2 focus:ring-ring focus:border-transparent"
+            )}
           >
             <option value="power">Sort by Power</option>
             <option value="name">Sort by Name</option>
@@ -90,13 +105,18 @@ export default function DRepList({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredAndSorted.length > 0 ? (
+        {loading ? (
+          // Show skeletons while loading
+          Array.from({ length: 6 }).map((_, i) => (
+            <DRepCardSkeleton key={i} />
+          ))
+        ) : filteredAndSorted.length > 0 ? (
           filteredAndSorted.map((drep) => (
             <DRepCard key={drep.drep_id} drep={drep} />
           ))
         ) : (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            {loading ? 'Loading...' : 'No DReps found matching your criteria'}
+          <div className="col-span-full text-center py-12 text-muted-foreground">
+            No DReps found matching your criteria
           </div>
         )}
       </div>
@@ -131,11 +151,6 @@ export default function DRepList({
         </div>
       )}
 
-      {loading && (
-        <div className="mt-4 text-center">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-field-green"></div>
-        </div>
-      )}
     </div>
   );
 }

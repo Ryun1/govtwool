@@ -50,14 +50,19 @@ export default function Home() {
             Browse DReps, vote on actions, and make your voice heard in the Cardano ecosystem.
           </p>
           <SheepFlock count={5} className="mb-12" />
-          <div className="flex justify-center gap-4">
-            <Link href="/dreps">
+          <div className="flex justify-center gap-4 flex-wrap">
+            <Link href="/dashboard">
               <Button size="lg" variant="primary">
+                View Dashboard
+              </Button>
+            </Link>
+            <Link href="/dreps">
+              <Button size="lg" variant="secondary">
                 Explore DReps
               </Button>
             </Link>
             <Link href="/actions">
-              <Button size="lg" variant="secondary">
+              <Button size="lg" variant="outline">
                 View Actions
               </Button>
             </Link>
