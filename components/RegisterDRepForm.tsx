@@ -53,19 +53,21 @@ export default function RegisterDRepForm() {
   return (
     <>
       <Card className="max-w-2xl mx-auto">
-        <h2 className="text-2xl font-bold mb-6">DRep Registration Information</h2>
+        <h2 className="text-2xl font-display font-bold mb-6">DRep Registration Information</h2>
         
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="metadata-url" className="block text-sm font-medium text-foreground mb-2">
               Metadata URL (Optional)
             </label>
             <input
+              id="metadata-url"
               type="url"
               value={formData.metadataUrl}
               onChange={(e) => setFormData({ ...formData, metadataUrl: e.target.value })}
               placeholder="https://example.com/metadata.json"
-              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
+              aria-label="Metadata URL for DRep registration (optional)"
             />
             <p className="text-xs text-muted-foreground mt-1">
               URL to JSON metadata containing DRep information (name, description, etc.)
@@ -73,15 +75,17 @@ export default function RegisterDRepForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="anchor-url" className="block text-sm font-medium text-foreground mb-2">
               Anchor URL (Optional)
             </label>
             <input
+              id="anchor-url"
               type="url"
               value={formData.anchorUrl}
               onChange={(e) => setFormData({ ...formData, anchorUrl: e.target.value })}
               placeholder="https://example.com/anchor"
-              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
+              aria-label="Anchor URL for DRep registration (optional)"
             />
             <p className="text-xs text-muted-foreground mt-1">
               URL to the anchor for your DRep registration
@@ -89,15 +93,17 @@ export default function RegisterDRepForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="anchor-hash" className="block text-sm font-medium text-foreground mb-2">
               Anchor Hash (Optional)
             </label>
             <input
+              id="anchor-hash"
               type="text"
               value={formData.anchorHash}
               onChange={(e) => setFormData({ ...formData, anchorHash: e.target.value })}
               placeholder="Hash of the anchor data"
-              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent font-mono placeholder:text-muted-foreground"
+              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent font-mono placeholder:text-muted-foreground min-h-[44px]"
+              aria-label="Anchor hash for DRep registration (optional)"
             />
             <p className="text-xs text-muted-foreground mt-1">
               Hash of the anchor data (if provided, must match the anchor URL)

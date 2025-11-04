@@ -110,7 +110,12 @@ export function VotingProgress({ votingResults, showLabels = true, compact = fal
           <div className="w-full bg-muted rounded-full h-2">
             <div
               className="bg-sky-blue h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(ccPct, 100)}%` }}
+              style={{ width: `${Math.min(ccPct, 100)}%` } as React.CSSProperties}
+              aria-label={`Constitutional Committee participation: ${ccPct.toFixed(1)}%`}
+              role="progressbar"
+              aria-valuenow={ccPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
             />
           </div>
         </div>
@@ -126,7 +131,12 @@ export function VotingProgress({ votingResults, showLabels = true, compact = fal
           <div className="w-full bg-muted rounded-full h-2">
             <div
               className="bg-field-green h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(drepPct, 100)}%` }}
+              style={{ width: `${Math.min(drepPct, 100)}%` } as React.CSSProperties}
+              aria-label={`DRep participation: ${drepPct.toFixed(1)}%`}
+              role="progressbar"
+              aria-valuenow={drepPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
             />
           </div>
         </div>
@@ -142,7 +152,12 @@ export function VotingProgress({ votingResults, showLabels = true, compact = fal
           <div className="w-full bg-muted rounded-full h-2">
             <div
               className="bg-field-dark h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(spoPct, 100)}%` }}
+              style={{ width: `${Math.min(spoPct, 100)}%` } as React.CSSProperties}
+              aria-label={`SPO participation: ${spoPct.toFixed(1)}%`}
+              role="progressbar"
+              aria-valuenow={spoPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
             />
           </div>
         </div>

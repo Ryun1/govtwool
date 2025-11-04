@@ -44,10 +44,16 @@ export default function DelegatePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">Delegate Voting Rights</h1>
+      <h1 className="text-4xl font-display font-bold mb-8">Delegate Voting Rights</h1>
       {loading && dreps.length === 0 ? (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-field-green"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-48 bg-muted rounded-lg"></div>
+              </div>
+            ))}
+          </div>
           <p className="mt-4 text-muted-foreground">Loading DReps...</p>
         </div>
       ) : (

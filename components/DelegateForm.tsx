@@ -76,16 +76,19 @@ export default function DelegateForm({ dreps, hasMore, onLoadMore, loading }: De
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-2xl font-bold mb-4">Select DRep</h2>
+          <h2 className="text-2xl font-display font-bold mb-4">Select DRep</h2>
           
           <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+            <label htmlFor="drep-search" className="sr-only">Search DReps</label>
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" aria-hidden="true" />
             <input
+              id="drep-search"
               type="text"
               placeholder="Search DReps..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+              className="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
+              aria-label="Search DReps by name, description, or ID"
             />
           </div>
 
@@ -100,11 +103,19 @@ export default function DelegateForm({ dreps, hasMore, onLoadMore, loading }: De
                     <button
                       key={drep.drep_id}
                       onClick={() => setSelectedDRep(drep)}
-                      className={`w-full text-left p-4 rounded-md border-2 transition-colors ${
+                      className={`w-full text-left p-4 rounded-md border-2 transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                         isSelected
                           ? 'border-field-green bg-field-green/10'
                           : 'border-input hover:border-field-green/50'
                       }`}
+                      aria-label={`Select DRep ${drepName}`}
+                      aria-pressed={isSelected}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedDRep(drep);
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -145,7 +156,7 @@ export default function DelegateForm({ dreps, hasMore, onLoadMore, loading }: De
         </Card>
 
         <Card>
-          <h2 className="text-2xl font-bold mb-4">Delegation Details</h2>
+          <h2 className="text-2xl font-display font-bold mb-4">Delegation Details</h2>
           
           {selectedDRep ? (
             <div className="space-y-4">

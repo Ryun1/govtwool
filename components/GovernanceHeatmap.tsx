@@ -59,15 +59,16 @@ export function GovernanceHeatmap({ actions }: GovernanceHeatmapProps) {
         {heatmapData.map((item, index) => (
           <div
             key={index}
-            className="aspect-square rounded-sm flex items-center justify-center text-xs"
+            className="aspect-square rounded-sm flex items-center justify-center text-xs bg-field-green transition-opacity"
             style={{
-              backgroundColor: `rgba(124, 179, 66, ${item.intensity})`,
-              opacity: item.count > 0 ? 1 : 0.3,
-            }}
+              opacity: item.count > 0 ? Math.max(0.3, item.intensity) : 0.1,
+            } as React.CSSProperties}
             title={`Epoch ${item.epoch}: ${item.count} action(s)`}
+            aria-label={`Epoch ${item.epoch}: ${item.count} action(s)`}
+            role="img"
           >
             {item.count > 0 && (
-              <span className="text-white font-semibold">{item.count}</span>
+              <span className="text-white font-semibold dark:text-foreground">{item.count}</span>
             )}
           </div>
         ))}

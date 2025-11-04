@@ -53,8 +53,8 @@ export default function ActionsPage() {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-4xl font-display font-bold text-foreground">Governance Actions</h1>
           {loadingMetadata && (
-            <Badge variant="info" className="flex items-center gap-2">
-              <Loader2 className="w-3 h-3 animate-spin" />
+            <Badge variant="info" className="flex items-center gap-2" aria-label="Loading metadata">
+              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
               <span>Loading metadata...</span>
             </Badge>
           )}
@@ -76,17 +76,21 @@ export default function ActionsPage() {
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 border border-input rounded-md bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
+            className="px-4 py-2 border border-input rounded-md bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted min-h-[44px] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Go to previous page"
+            aria-disabled={currentPage === 1}
           >
             Previous
           </button>
-          <span className="px-4 py-2 text-foreground">
+          <span className="px-4 py-2 text-foreground" aria-label={`Current page: ${currentPage}`}>
             Page {currentPage}
           </span>
           <button
             onClick={() => setCurrentPage(p => p + 1)}
             disabled={!hasMore}
-            className="px-4 py-2 border border-input rounded-md bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
+            className="px-4 py-2 border border-input rounded-md bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted min-h-[44px] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Go to next page"
+            aria-disabled={!hasMore}
           >
             Next
           </button>

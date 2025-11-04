@@ -192,7 +192,7 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h1 className="text-3xl font-bold text-foreground mb-4">{title}</h1>
+                  <h1 className="text-3xl font-display font-bold text-foreground mb-4">{title}</h1>
                   <div className="flex items-center space-x-2 mb-4 flex-wrap gap-2">
                     <Badge variant="default">{formatActionType(action.type)}</Badge>
                     <Badge variant={getStatusVariant(status)}>{status}</Badge>
@@ -411,14 +411,19 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">Yes</span>
-                      <span className="text-sm font-semibold text-green-600">{formatVotingPower(totalYes.toString())}</span>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">{formatVotingPower(totalYes.toString())}</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
-                        className="bg-green-500 h-2 rounded-full transition-all"
+                        className="bg-green-500 dark:bg-green-600 h-2 rounded-full transition-all"
                         style={{
                           width: `${votingResults.total_voting_power !== '0' ? (Number(totalYes) / Number(votingResults.total_voting_power)) * 100 : 0}%`,
-                        }}
+                        } as React.CSSProperties}
+                        aria-label={`Yes votes: ${formatVotingPower(totalYes.toString())}`}
+                        role="progressbar"
+                        aria-valuenow={votingResults.total_voting_power !== '0' ? (Number(totalYes) / Number(votingResults.total_voting_power)) * 100 : 0}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                       />
                     </div>
                   </div>
@@ -426,14 +431,19 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">No</span>
-                      <span className="text-sm font-semibold text-red-600">{formatVotingPower(totalNo.toString())}</span>
+                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">{formatVotingPower(totalNo.toString())}</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
-                        className="bg-red-500 h-2 rounded-full transition-all"
+                        className="bg-red-500 dark:bg-red-600 h-2 rounded-full transition-all"
                         style={{
                           width: `${votingResults.total_voting_power !== '0' ? (Number(totalNo) / Number(votingResults.total_voting_power)) * 100 : 0}%`,
-                        }}
+                        } as React.CSSProperties}
+                        aria-label={`No votes: ${formatVotingPower(totalNo.toString())}`}
+                        role="progressbar"
+                        aria-valuenow={votingResults.total_voting_power !== '0' ? (Number(totalNo) / Number(votingResults.total_voting_power)) * 100 : 0}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                       />
                     </div>
                   </div>
@@ -441,14 +451,19 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">Abstain</span>
-                      <span className="text-sm font-semibold text-yellow-600">{formatVotingPower(totalAbstain.toString())}</span>
+                      <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">{formatVotingPower(totalAbstain.toString())}</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
-                        className="bg-yellow-500 h-2 rounded-full transition-all"
+                        className="bg-yellow-500 dark:bg-yellow-600 h-2 rounded-full transition-all"
                         style={{
                           width: `${votingResults.total_voting_power !== '0' ? (Number(totalAbstain) / Number(votingResults.total_voting_power)) * 100 : 0}%`,
-                        }}
+                        } as React.CSSProperties}
+                        aria-label={`Abstain votes: ${formatVotingPower(totalAbstain.toString())}`}
+                        role="progressbar"
+                        aria-valuenow={votingResults.total_voting_power !== '0' ? (Number(totalAbstain) / Number(votingResults.total_voting_power)) * 100 : 0}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                       />
                     </div>
                   </div>
