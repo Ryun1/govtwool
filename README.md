@@ -141,6 +141,36 @@ govtwool/
 2. Fill in optional metadata (URL, anchor, etc.)
 3. Confirm the registration transaction in your wallet
 
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment.
+
+### Status
+![CI](https://github.com/your-org/govtwool/workflows/CI/badge.svg)
+
+### Quick CI Checks
+
+Run these locally before pushing:
+
+```bash
+# Validate CI setup
+./scripts/validate-ci.sh
+
+# Run all CI checks
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+### Workflows
+
+- **CI** (`ci.yml`): Runs on push/PR - Lints, type-checks, and builds
+- **Code Quality** (`quality.yml`): Weekly quality audits and dependency checks
+- **PR Checks** (`pr-checks.yml`): Enhanced checks for pull requests
+- **Deploy** (`deploy.yml`): Manual deployment workflow
+
+For detailed CI/CD documentation, see [CICD.md](./CICD.md).
+
 ## License
 
 Apache License 2.0

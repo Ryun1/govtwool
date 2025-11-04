@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel in-progress runs for the same workflow and branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Type Check & Build
+    runs-on: ubuntu-latest
+    
+    # Use Node.js version from package.json engines field
+    # Package.json specifies >=20.9.0, so we'll use 20.x LTS
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: 📋 Get npm cache directory
+        id: npm-cache-dir-path
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+
+      - name: 💾 Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: 📥 Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: 🏗️ Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: 🔍 Lint code
+        run: npm run lint
+
+      - name: 🔧 Type check
+        run: npx tsc --noEmit
+
+      - name: 🏗️ Build project
+        env:
+          # Next.js build requires these env vars, but we'll use dummy values for CI
+          # In production, these should be set as GitHub secrets
+          BLOCKFROST_API_KEY: ${{ secrets.BLOCKFROST_API_KEY || 'dummy-key-for-ci' }}
+          BLOCKFROST_NETWORK: ${{ secrets.BLOCKFROST_NETWORK || 'mainnet' }}
+        run: npm run build
+
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: build-artifacts
+          path: .next
+          retention-days: 7
