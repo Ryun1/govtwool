@@ -20,9 +20,28 @@
 import { bech32 as bech32lib } from 'bech32';
 
 /**
+ * Check if a DRep ID is a special system DRep (not a valid Bech32 ID)
+ */
+export function isSpecialSystemDRep(drepId: string): boolean {
+  // Special system DReps that are not valid Bech32 IDs
+  const specialDReps = [
+    'drep_always_abstain',
+    'drep_always_no_confidence',
+    'drep_always_yes',
+    'drep_always_no',
+  ];
+  return specialDReps.includes(drepId);
+}
+
+/**
  * Check if a DRep ID is valid
  */
 export function isValidDRepID(bechID: string): boolean {
+  // Special system DReps are valid DRep IDs but not Bech32 format
+  if (isSpecialSystemDRep(bechID)) {
+    return true;
+  }
+  
   // DRep ID regex pattern
   // they start with drep1 (at length of 56 or 58) or drep_script1 (at length of 63)
   const drepIDPattern = /^(drep1[a-zA-Z0-9]{51,53}|drep_script1[a-zA-Z0-9]{51})$/;
@@ -143,6 +162,11 @@ export function convertCIP129ToCIP105(cip129ID: string): string {
  * Normalize DRep ID to CIP-129 format (used throughout the application)
  */
 export function normalizeToCIP129(drepID: string): string {
+  // Special system DReps cannot be converted to CIP-129 (they're not Bech32)
+  if (isSpecialSystemDRep(drepID)) {
+    return drepID; // Return as-is for special system DReps
+  }
+  
   if (!isValidDRepID(drepID)) {
     throw new Error(`Invalid DRep ID: ${drepID}`);
   }

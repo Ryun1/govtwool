@@ -13,17 +13,24 @@ export function GovernanceHeatmap({ actions }: GovernanceHeatmapProps) {
     const byEpoch: Record<number, number> = {};
     
     actions.forEach((action) => {
-      const epoch = action.voting_epoch || action.enactment_epoch || 0;
-      byEpoch[epoch] = (byEpoch[epoch] || 0) + 1;
+      const epoch = action.voting_epoch || action.enactment_epoch || action.proposed_epoch || 0;
+      if (epoch > 0) {
+        byEpoch[epoch] = (byEpoch[epoch] || 0) + 1;
+      }
     });
 
-    // Get min and max epochs
+    // Get all epochs and sort
     const epochs = Object.keys(byEpoch).map(Number).sort((a, b) => a - b);
-    const minEpoch = Math.min(...epochs, 0);
-    const maxEpoch = Math.max(...epochs, 0);
+    if (epochs.length === 0) {
+      return [];
+    }
+
+    // Get the last 30 epochs (or fewer if we don't have 30)
+    const maxEpoch = Math.max(...epochs);
+    const minEpoch = Math.max(maxEpoch - 29, Math.min(...epochs));
     const maxCount = Math.max(...Object.values(byEpoch), 1);
 
-    // Create data for visualization
+    // Create data for visualization (last 30 epochs)
     const data: { epoch: number; count: number; intensity: number }[] = [];
     for (let epoch = minEpoch; epoch <= maxEpoch; epoch++) {
       const count = byEpoch[epoch] || 0;
@@ -47,9 +54,9 @@ export function GovernanceHeatmap({ actions }: GovernanceHeatmapProps) {
 
   return (
     <div className="w-full">
-      <h3 className="text-lg font-semibold mb-4">Governance Activity by Epoch</h3>
-      <div className="grid grid-cols-12 gap-1">
-        {heatmapData.slice(-36).map((item, index) => (
+      <h3 className="text-lg font-semibold mb-4">Governance Activity by Epoch (Last 30 Epochs)</h3>
+      <div className="grid grid-cols-10 gap-1">
+        {heatmapData.map((item, index) => (
           <div
             key={index}
             className="aspect-square rounded-sm flex items-center justify-center text-xs"

@@ -6,23 +6,26 @@ import type { DRep } from '@/types/governance';
 
 interface DRepsSummaryStatsProps {
   dreps: DRep[];
+  activeDRepsCount?: number | null; // Total active DReps from Koios epoch summary
 }
 
-export function DRepsSummaryStats({ dreps }: DRepsSummaryStatsProps) {
+export function DRepsSummaryStats({ dreps, activeDRepsCount }: DRepsSummaryStatsProps) {
+  // Calculate stats from the provided DReps array
+  // Note: If dreps.length is small (e.g., 100), it means we're still loading all DReps
+  // The stats will update once all DReps are loaded
   const stats = {
     total: dreps.length,
-    // Count active DReps using both status and active fields
-    active: dreps.filter(d => {
-      if (d.active !== undefined) {
-        return d.active && !d.retired;
-      }
-      return d.status === 'active';
-    }).length,
-    totalVotingPower: dreps.reduce((sum, d) => {
-      // Use amount field if available (from DRep endpoint), otherwise fallback
-      const power = BigInt(d.amount || d.voting_power_active || d.voting_power || '0');
-      return sum + power;
-    }, BigInt(0)),
+    // Use Koios epoch summary for active DReps count if available, otherwise fallback to local count
+    active: activeDRepsCount !== null && activeDRepsCount !== undefined 
+      ? activeDRepsCount 
+      : dreps.filter(d => {
+          if (d.active !== undefined) {
+            return d.active && !d.retired;
+          }
+          return d.status === 'active';
+        }).length,
+    // Total voting power - using placeholder as it's hard to calculate accurately from APIs
+    totalVotingPower: 'N/A' as const,
     topVotingPower: dreps.reduce((max, d) => {
       // Use amount field if available (from DRep endpoint), otherwise fallback
       const power = BigInt(d.amount || d.voting_power_active || d.voting_power || '0');
@@ -56,7 +59,7 @@ export function DRepsSummaryStats({ dreps }: DRepsSummaryStatsProps) {
     },
     {
       label: 'Total Voting Power',
-      value: formatADA(stats.totalVotingPower),
+      value: stats.totalVotingPower === 'N/A' ? 'N/A' : formatADA(stats.totalVotingPower),
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'text-field-dark',
     },

@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from './ui/Card';
 import { Badge } from './ui/Badge';
-import { Users, TrendingUp, ExternalLink, Vote, Activity } from 'lucide-react';
+import { Users, TrendingUp, ExternalLink, Vote, Activity, Shield } from 'lucide-react';
 import type { DRep } from '@/types/governance';
+import { isSpecialSystemDRep } from '@/lib/drep-id';
+import { getSystemDRepInfo } from '@/lib/governance';
 import { cn } from '@/lib/utils';
 
 interface DRepCardProps {
@@ -34,11 +36,17 @@ function formatNumber(num: number | undefined): string {
 }
 
 export default function DRepCard({ drep }: DRepCardProps) {
+  const isSystemDRep = isSpecialSystemDRep(drep.drep_id);
+  const systemDRepInfo = isSystemDRep ? getSystemDRepInfo(drep.drep_id) : null;
+  
   // Use name from metadata (priority: metadata.name > metadata.title > view > drep_id)
-  const drepName = drep.metadata?.name || 
+  // For system DReps, use their friendly name
+  const drepName = systemDRepInfo?.name ||
+                   drep.metadata?.name || 
                    drep.metadata?.title || 
                    drep.view || 
                    drep.drep_id.slice(0, 8);
+  const showDrepId = !!(drep.metadata?.name || drep.metadata?.title || drep.view) && !isSystemDRep;
   const status = drep.status || (drep.active === false ? 'inactive' : drep.retired ? 'retired' : 'active');
   const hasProfile = !!(drep.metadata?.name || drep.metadata?.description || drep.metadata?.website);
   // Use amount field if available (from DRep endpoint), otherwise fallback to voting_power
@@ -48,23 +56,42 @@ export default function DRepCard({ drep }: DRepCardProps) {
 
   return (
     <Link href={`/dreps/${drep.drep_id}`} className="block h-full">
-      <Card className="h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover border-2 hover:border-field-green/50">
+      <Card className={cn(
+        "h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover border-2",
+        isSystemDRep 
+          ? "border-purple-500/30 hover:border-purple-500/50 bg-gradient-to-br from-purple-500/5 to-purple-600/5" 
+          : "hover:border-field-green/50"
+      )}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5">
+                {isSystemDRep && systemDRepInfo?.icon && (
+                  <span className="text-xl shrink-0">{systemDRepInfo.icon}</span>
+                )}
                 <h3 className="text-lg font-semibold text-foreground truncate">
                   {drepName}
                 </h3>
-                {hasProfile && (
+                {isSystemDRep && (
+                  <Badge variant="info" className="text-xs shrink-0 bg-purple-500/20 text-purple-300 border-purple-500/30">
+                    <Shield className="w-3 h-3 mr-1" />
+                    System
+                  </Badge>
+                )}
+                {hasProfile && !isSystemDRep && (
                   <Badge variant="info" className="text-xs shrink-0">
                     Profile
                   </Badge>
                 )}
               </div>
-              {drep.metadata?.description && (
+              {showDrepId && (
+                <p className="text-xs text-muted-foreground mb-1 font-mono">
+                  {drep.drep_id.slice(0, 8)}...
+                </p>
+              )}
+              {(systemDRepInfo?.description || drep.metadata?.description) && (
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                  {drep.metadata.description}
+                  {systemDRepInfo?.description || drep.metadata?.description}
                 </p>
               )}
               <div className="flex items-center gap-2">

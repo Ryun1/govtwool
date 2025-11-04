@@ -1,18 +1,72 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Timeline, TimelineEvent } from './ui/Timeline';
 import type { GovernanceAction } from '@/types/governance';
 
 interface ActionTimelineProps {
   actions: GovernanceAction[];
 }
 
+/**
+ * Get metadata title from action (ensures it's always a string)
+ */
+function getMetadataTitle(action: GovernanceAction): string {
+  // Try meta_json first
+  if (action.meta_json) {
+    try {
+      const parsed = typeof action.meta_json === 'string' 
+        ? JSON.parse(action.meta_json) 
+        : action.meta_json;
+      // Handle if title is an object (e.g., {tag: "h1", content: "Title"})
+      if (parsed.title) {
+        if (typeof parsed.title === 'string') {
+          return parsed.title;
+        }
+        if (typeof parsed.title === 'object' && parsed.title !== null) {
+          // Try to extract string from object structures
+          return parsed.title.content || parsed.title.text || parsed.title.value || String(parsed.title);
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+  
+  // Try metadata field
+  if (action.metadata) {
+    const title = action.metadata.title;
+    if (typeof title === 'string') {
+      return title;
+    }
+    if (typeof title === 'object' && title !== null) {
+      // Handle object title structures
+      return (title as any).content || (title as any).text || (title as any).value || String(title);
+    }
+  }
+  
+  // Fallback to description or action ID (ensure it's a string)
+  if (action.description) {
+    if (typeof action.description === 'string') {
+      return action.description;
+    }
+    // Handle if description is an object
+    if (typeof action.description === 'object' && action.description !== null) {
+      return (action.description as any).content || 
+             (action.description as any).text || 
+             (action.description as any).value || 
+             (action.description as any).description ||
+             String(action.description);
+    }
+  }
+  
+  return `Action ${action.action_id.slice(0, 8)}`;
+}
+
 export function ActionTimeline({ actions }: ActionTimelineProps) {
   const sortedActions = useMemo(() => {
     return [...actions].sort((a, b) => {
-      const epochA = a.voting_epoch || a.enactment_epoch || 0;
-      const epochB = b.voting_epoch || b.enactment_epoch || 0;
+      const epochA = a.voting_epoch || a.enactment_epoch || a.proposed_epoch || 0;
+      const epochB = b.voting_epoch || b.enactment_epoch || b.proposed_epoch || 0;
       return epochB - epochA;
     }).slice(0, 20);
   }, [actions]);
@@ -29,9 +83,10 @@ export function ActionTimeline({ actions }: ActionTimelineProps) {
     <div className="w-full">
       <h3 className="text-lg font-semibold mb-4">Recent Governance Actions Timeline</h3>
       <div className="space-y-4">
-        {sortedActions.map((action, index) => {
+        {sortedActions.map((action) => {
           const status = action.status || 'submitted';
-          const title = action.metadata?.title || action.description || `Action ${action.action_id.slice(0, 8)}`;
+          const title = getMetadataTitle(action);
+          const epoch = action.voting_epoch || action.enactment_epoch || action.proposed_epoch || 'N/A';
           
           return (
             <div key={action.action_id} className="flex items-start space-x-4">
@@ -40,10 +95,10 @@ export function ActionTimeline({ actions }: ActionTimelineProps) {
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-semibold text-foreground line-clamp-1">{title}</h4>
                   <span className="text-xs text-muted-foreground">
-                    Epoch {action.voting_epoch || action.enactment_epoch || 'N/A'}
+                    Epoch {epoch}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground mb-2">{action.type}</p>
+                <p className="text-sm text-muted-foreground mb-2">{String(action.type)}</p>
                 <span className={`inline-block px-2 py-1 rounded text-xs ${
                   status === 'enacted' ? 'bg-green-500/10 text-green-700 dark:text-green-400' :
                   status === 'voting' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400' :

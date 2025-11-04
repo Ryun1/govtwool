@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { VotingPowerChart } from './VotingPowerChart';
-import { ExternalLink, TrendingUp, Calendar, Hash, User, Mail, Globe, FileText, Users } from 'lucide-react';
+import { ExternalLink, TrendingUp, Calendar, Hash, User, Mail, Globe, FileText, Users, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/Tabs';
 import type { DRep, DRepVotingHistory, DRepDelegator } from '@/types/governance';
@@ -40,6 +40,8 @@ function formatVoteCount(vote: 'yes' | 'no' | 'abstain'): string {
 }
 
 export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRepDetailProps) {
+  const [copiedId, setCopiedId] = useState(false);
+  
   // Use name from metadata endpoint (rich metadata), fallback to view, then drep_id
   // Priority: metadata.name > metadata.title > view > drep_id
   const drepName = drep.metadata?.name || 
@@ -49,6 +51,16 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
   const status = drep.status || 'active';
   const hasLogo = !!(drep.metadata?.logo || drep.metadata?.image || drep.metadata?.picture);
   const logoUrl = drep.metadata?.logo || drep.metadata?.image || drep.metadata?.picture;
+
+  const handleCopyDRepId = async () => {
+    try {
+      await navigator.clipboard.writeText(drep.drep_id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy DRep ID:', error);
+    }
+  };
 
   const voteStats = useMemo(() => {
     const stats = { yes: 0, no: 0, abstain: 0 };
@@ -262,11 +274,26 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
               {drep.registration_tx_hash && (
                 <div className="mt-4 p-3 rounded-md bg-muted/30 border border-border">
                   <p className="text-sm font-medium text-muted-foreground mb-2">Registration Transaction</p>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <Hash className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <code className="text-sm bg-muted px-2 py-1 rounded text-foreground font-mono break-all">
+                    <code className="flex-1 text-sm bg-muted px-2 py-1 rounded text-foreground font-mono break-all">
                       {drep.registration_tx_hash}
                     </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(drep.registration_tx_hash || '');
+                        } catch (error) {
+                          console.error('Failed to copy transaction hash:', error);
+                        }
+                      }}
+                      className="shrink-0"
+                      aria-label="Copy transaction hash"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               )}
@@ -398,10 +425,35 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
         <div>
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-bold">Statistics</h2>
+              <h2 className="text-xl font-bold">DRep Information</h2>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* DRep ID with Copy Button */}
+                <div className="pb-4 border-b border-border">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">DRep ID</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm bg-muted px-3 py-2 rounded text-foreground font-mono break-all">
+                      {drep.drep_id}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCopyDRepId}
+                      className="shrink-0"
+                      aria-label="Copy DRep ID"
+                    >
+                      {copiedId ? (
+                        <Check className="w-4 h-4 text-field-green" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {copiedId && (
+                    <p className="text-xs text-field-green mt-1">Copied to clipboard!</p>
+                  )}
+                </div>
                 {/* Voting Statistics */}
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">Voting Statistics</p>
