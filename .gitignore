@@ -41,5 +41,6 @@ next-env.d.ts
 # rust
 target/
 **/target/
-Cargo.lock
+# Note: Cargo.lock should be committed for binaries (like our backend)
+# backend/Cargo.lock
 **/*.rs.bk

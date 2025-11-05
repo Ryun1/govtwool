@@ -3,7 +3,7 @@ FROM rust:1.75-slim as builder
 
 WORKDIR /app
 
-# Copy manifest files
+# Copy manifest files first for better Docker layer caching
 COPY Cargo.toml Cargo.lock ./
 
 # Copy source code
