@@ -22,7 +22,7 @@ impl ProviderRouter {
     // - DRep delegators: Use Koios (specialized endpoint), fallback to Blockfrost
     // - DRep voting history: Use Koios (specialized endpoint), fallback to Blockfrost
     // - Governance actions list: Try Koios first, fallback to Blockfrost
-    // - Governance action details: Use Blockfrost (more complete)
+    // - Governance action details: Try Koios first, fallback to Blockfrost
     // - Voting results: Use Koios (specialized), fallback to Blockfrost
     // - Active DReps count: Use Koios epoch summary
 
@@ -116,7 +116,21 @@ impl ProviderRouter {
         &self,
         id: &str,
     ) -> Result<Option<GovernanceAction>, anyhow::Error> {
-        // Use Blockfrost (more complete)
+        // Try Koios first
+        match self.koios.get_governance_action(id).await {
+            Ok(Some(action)) => {
+                tracing::debug!("Using Koios for governance action");
+                return Ok(Some(action));
+            }
+            Ok(None) => {
+                tracing::debug!("Koios returned None, falling back to Blockfrost for governance action");
+            }
+            Err(e) => {
+                tracing::debug!("Koios failed for governance action: {}, falling back to Blockfrost", e);
+            }
+        }
+
+        // Fallback to Blockfrost
         self.blockfrost.get_governance_action(id).await
     }
 
