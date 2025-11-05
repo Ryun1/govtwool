@@ -53,7 +53,7 @@ export async function connectWallet(walletName: WalletName): Promise<ConnectedWa
       throw new Error(`Wallet ${walletName} not found`);
     }
 
-    const wallet = await BrowserWallet.enable(walletName);
+    const wallet = await BrowserWallet.enable(walletName, [{ cip: 95 }]);
     const addresses = await wallet.getUsedAddresses();
     const address = addresses[0];
     
