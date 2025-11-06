@@ -46,7 +46,7 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: 'deploy --prod --yes'
+          vercel-args: 'deploy --prod --confirm'
           working-directory: frontend
 
       - name: ✅ Frontend Deployment Summary
