@@ -1,153 +1,266 @@
 'use client';
 
-import { useState } from 'react';
+import { ChangeEvent, useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { TransactionModal } from './TransactionModal';
 import { useWalletContext } from '../layout/WalletProvider';
 import { useTransaction } from '@/hooks/useTransaction';
-import { submitDRepRegistrationTransaction } from '@/lib/governance/transactions/registerDRep';
+import {
+  submitDRepRegistrationTransaction,
+  submitDRepUpdateTransaction,
+  submitDRepRetirementTransaction,
+} from '@/lib/governance/transactions/registerDRep';
+
+type DRepAction = 'register' | 'update' | 'retire';
+
+interface FormState {
+  metadataUrl: string;
+  anchorUrl: string;
+  anchorHash: string;
+}
+
+interface ActionConfig {
+  selectorLabel: string;
+  heading: string;
+  description: string;
+  buttonLabel: string;
+  notes: string[];
+  placeholderMessage?: string;
+}
+
+const INITIAL_FORM_STATE: FormState = {
+  metadataUrl: '',
+  anchorUrl: '',
+  anchorHash: '',
+};
+
+const ACTION_CONFIG: Record<DRepAction, ActionConfig> = {
+  register: {
+    selectorLabel: 'Register',
+    heading: 'Register as a DRep',
+    description: 'Publish your DRep certificate and optional metadata so delegators can discover you.',
+    buttonLabel: 'Register as DRep',
+    notes: [
+      'All metadata fields are optional but improve delegate transparency.',
+      'Registration requires the DRep deposit in addition to transaction fees.',
+      'Ensure your wallet has enough ADA to cover the deposit and fees.',
+    ],
+  },
+  update: {
+    selectorLabel: 'Update',
+    heading: 'Update DRep Details',
+    description: 'Refresh your anchor information or metadata. Deposit remains untouched.',
+    buttonLabel: 'Update DRep',
+    notes: [
+      'Updating publishes new anchor data for your existing DRep.',
+      'Provide both anchor URL and hash for verifiable updates.',
+      'Only transaction fees are required for updates.',
+    ],
+  },
+  retire: {
+    selectorLabel: 'Retire',
+    heading: 'Retire as a DRep',
+    description: 'Deregister your DRep certificate and reclaim the deposit once processed.',
+    buttonLabel: 'Retire DRep',
+    notes: [
+      'Retiring refunds your DRep deposit after the transaction is confirmed.',
+      'You will need to register again to resume DRep responsibilities.',
+      'Make sure you have communicated your retirement to delegators.',
+    ],
+  },
+};
+
+const ACTION_ORDER: DRepAction[] = ['register', 'update', 'retire'];
 
 export default function RegisterDRepForm() {
   const { connectedWallet } = useWalletContext();
   const { state, reset, setBuilding, setSigning, setSubmitting, setTxHash, setError } = useTransaction();
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    metadataUrl: '',
-    anchorUrl: '',
-    anchorHash: '',
-  });
+  const [activeAction, setActiveAction] = useState<DRepAction>('register');
+  const [formData, setFormData] = useState<FormState>({ ...INITIAL_FORM_STATE });
+
+  const walletConnected = Boolean(connectedWallet);
+  const actionConfig = ACTION_CONFIG[activeAction];
+  const showMetadataField = activeAction === 'register';
+  const showAnchorFields = activeAction !== 'retire';
+
+  const handleInputChange = (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleSubmit = async () => {
-    if (!connectedWallet) return;
+    if (!connectedWallet) {
+      return;
+    }
 
     reset();
-    setShowModal(true);
-    setBuilding(true);
-
     try {
-      const txHash = await submitDRepRegistrationTransaction(connectedWallet, {
-        metadataUrl: formData.metadataUrl || undefined,
-        anchorUrl: formData.anchorUrl || undefined,
-        anchorHash: formData.anchorHash || undefined,
-      });
-      setBuilding(false);
+      setBuilding(true);
+      setSigning(false);
+      setSubmitting(false);
+      let txHash: string;
+      if (activeAction === 'register') {
+        txHash = await submitDRepRegistrationTransaction(connectedWallet, {
+          metadataUrl: formData.metadataUrl || undefined,
+          anchorUrl: formData.anchorUrl || undefined,
+          anchorHash: formData.anchorHash || undefined,
+        });
+      } else if (activeAction === 'update') {
+        txHash = await submitDRepUpdateTransaction(connectedWallet, {
+          anchorUrl: formData.anchorUrl || undefined,
+          anchorHash: formData.anchorHash || undefined,
+        });
+      } else {
+        txHash = await submitDRepRetirementTransaction(connectedWallet);
+      }
       setTxHash(txHash);
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to submit transaction.';
+      setError(message);
+    } finally {
       setBuilding(false);
-      setError(error.message || 'Failed to submit transaction');
+      setSigning(false);
+      setSubmitting(false);
     }
   };
 
-  if (!connectedWallet) {
-    return (
-      <Card>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">Please connect your wallet to register as a DRep</p>
-          <p className="text-sm text-muted-foreground">Use the wallet connection button in the navigation bar</p>
-        </div>
-      </Card>
-    );
-  }
+  const handleModalClose = () => {
+    const wasSuccessful = Boolean(state.txHash);
+
+    setShowModal(false);
+    reset();
+
+    if (wasSuccessful) {
+      setFormData({ ...INITIAL_FORM_STATE });
+    }
+  };
 
   return (
     <>
-      <Card className="max-w-2xl mx-auto">
-        <h2 className="text-2xl font-display font-bold mb-6">DRep Registration Information</h2>
-        
+      <Card className="max-w-3xl mx-auto">
         <div className="space-y-6">
-          <div>
-            <label htmlFor="metadata-url" className="block text-sm font-medium text-foreground mb-2">
-              Metadata URL (Optional)
-            </label>
-            <input
-              id="metadata-url"
-              type="url"
-              value={formData.metadataUrl}
-              onChange={(e) => setFormData({ ...formData, metadataUrl: e.target.value })}
-              placeholder="https://example.com/metadata.json"
-              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
-              aria-label="Metadata URL for DRep registration (optional)"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              URL to JSON metadata containing DRep information (name, description, etc.)
-            </p>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-display font-bold">{actionConfig.heading}</h2>
+            <p className="text-sm text-muted-foreground">{actionConfig.description}</p>
+            {!walletConnected && (
+              <p className="text-xs text-destructive">Connect a wallet from the navigation bar to manage your DRep.</p>
+            )}
           </div>
 
-          <div>
-            <label htmlFor="anchor-url" className="block text-sm font-medium text-foreground mb-2">
-              Anchor URL (Optional)
-            </label>
-            <input
-              id="anchor-url"
-              type="url"
-              value={formData.anchorUrl}
-              onChange={(e) => setFormData({ ...formData, anchorUrl: e.target.value })}
-              placeholder="https://example.com/anchor"
-              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
-              aria-label="Anchor URL for DRep registration (optional)"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              URL to the anchor for your DRep registration
-            </p>
+          <div className="flex flex-wrap gap-2">
+            {ACTION_ORDER.map(action => (
+              <Button
+                key={action}
+                type="button"
+                variant={activeAction === action ? 'primary' : 'outline'}
+                onClick={() => {
+                  setActiveAction(action);
+                  reset();
+                  setFormData({ ...INITIAL_FORM_STATE });
+                }}
+              >
+                {ACTION_CONFIG[action].selectorLabel}
+              </Button>
+            ))}
           </div>
 
-          <div>
-            <label htmlFor="anchor-hash" className="block text-sm font-medium text-foreground mb-2">
-              Anchor Hash (Optional)
-            </label>
-            <input
-              id="anchor-hash"
-              type="text"
-              value={formData.anchorHash}
-              onChange={(e) => setFormData({ ...formData, anchorHash: e.target.value })}
-              placeholder="Hash of the anchor data"
-              className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent font-mono placeholder:text-muted-foreground min-h-[44px]"
-              aria-label="Anchor hash for DRep registration (optional)"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Hash of the anchor data (if provided, must match the anchor URL)
-            </p>
+          <div className="space-y-4">
+            {showMetadataField && (
+              <div className="space-y-2">
+                <label htmlFor="metadata-url" className="block text-sm font-medium text-foreground">
+                  Metadata URL (optional)
+                </label>
+                <input
+                  id="metadata-url"
+                  type="url"
+                  value={formData.metadataUrl}
+                  onChange={handleInputChange('metadataUrl')}
+                  placeholder="https://example.com/metadata.json"
+                  className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
+                  aria-label="Metadata URL for DRep registration"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Link to JSON metadata describing your DRep (name, description, contact, etc.).
+                </p>
+              </div>
+            )}
+
+            {showAnchorFields && (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="anchor-url" className="block text-sm font-medium text-foreground">
+                    Anchor URL (optional)
+                  </label>
+                  <input
+                    id="anchor-url"
+                    type="url"
+                    value={formData.anchorUrl}
+                    onChange={handleInputChange('anchorUrl')}
+                    placeholder="https://example.com/anchor"
+                    className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground min-h-[44px]"
+                    aria-label="Anchor URL for DRep"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Include a pointer to supporting materials for your DRep {activeAction === 'update' ? 'update' : 'registration'}.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="anchor-hash" className="block text-sm font-medium text-foreground">
+                    Anchor Hash (optional)
+                  </label>
+                  <input
+                    id="anchor-hash"
+                    type="text"
+                    value={formData.anchorHash}
+                    onChange={handleInputChange('anchorHash')}
+                    placeholder="Hash of the anchor contents"
+                    className="w-full px-4 py-2 border border-input rounded-md bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent font-mono placeholder:text-muted-foreground min-h-[44px]"
+                    aria-label="Anchor hash for DRep"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Provide the hash of your anchor data to let delegators verify its integrity.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Important Notes:</h3>
+            <h3 className="font-semibold text-blue-900 mb-2">Important Notes</h3>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>All fields are optional, but providing metadata improves transparency</li>
-              <li>You will need to pay a deposit to register as a DRep</li>
-              <li>Make sure your wallet has sufficient ADA for the registration deposit</li>
-              <li>This action cannot be undone, so please verify all information</li>
+              {actionConfig.notes.map(note => (
+                <li key={note}>{note}</li>
+              ))}
             </ul>
           </div>
 
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Your Wallet:</p>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Connected wallet</p>
             <p className="text-sm font-mono break-all bg-muted px-3 py-2 rounded text-foreground">
-              {connectedWallet.address}
+              {connectedWallet?.address ?? 'Not connected'}
             </p>
           </div>
 
           <Button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              reset();
+              setShowModal(true);
+            }}
             size="lg"
             className="w-full"
+            disabled={!walletConnected}
           >
-            Register as DRep
+            {actionConfig.buttonLabel}
           </Button>
         </div>
       </Card>
 
       <TransactionModal
         isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          if (state.txHash || state.error) {
-            reset();
-            if (state.txHash) {
-              setFormData({ metadataUrl: '', anchorUrl: '', anchorHash: '' });
-            }
-          }
-        }}
+        onClose={handleModalClose}
         isBuilding={state.isBuilding}
         isSigning={state.isSigning}
         isSubmitting={state.isSubmitting}

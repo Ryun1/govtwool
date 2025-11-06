@@ -1,5 +1,5 @@
 import type { ConnectedWallet } from '@/lib/api/mesh';
-import { getFile, hashDrepAnchor, KoiosProvider, MeshTxBuilder } from '@meshsdk/core';
+import { KoiosProvider, MeshTxBuilder } from '@meshsdk/core';
 
 export interface DRepRegistrationData {
   metadataUrl?: string;
@@ -7,86 +7,115 @@ export interface DRepRegistrationData {
   anchorHash?: string;
 }
 
-async function getMeshJsonHash(url: string) {
-  var drepAnchor = getFile(url);
-  const anchorObj = JSON.parse(drepAnchor);
-  return hashDrepAnchor(anchorObj);
+export interface DRepUpdateData {
+  anchorUrl?: string;
+  anchorHash?: string;
 }
 
-const anchorUrl = "https://meshjs.dev/governance/meshjs.jsonld";
+export type GovernanceTransactionStage = 'building' | 'signing' | 'submitting';
+export type StageChangeCallback = (stage: GovernanceTransactionStage) => void;
 
-/**
- * Build and submit a DRep registration transaction
- * @throws Error if wallet does not support CIP-95
- */
-export async function submitDRepRegistrationTransaction(
-  wallet: ConnectedWallet,
-  registrationData: DRepRegistrationData
-): Promise<string> {
-  // Get DRep ID from wallet
-  const dRep = await wallet.wallet.getDRep();
-  const dRepId = dRep.dRepIDCip105;
-  console.log('Drep id ',dRepId)
+type KoiosNetwork = 'api' | 'preview' | 'preprod' | 'guild';
 
-  // Prepare anchor hash (only if anchorUrl is provided)
-  let anchorHash = registrationData.anchorHash;
-  if (registrationData.anchorUrl && !anchorHash) {
-    anchorHash = await getMeshJsonHash(anchorUrl);
+function resolveKoiosNetwork(networkId: number): KoiosNetwork {
+  switch (networkId) {
+    case 0:
+      return 'preview'; // testnet (note: consider preprod detection if needed)
+    case 1:
+    default:
+      return 'api'; // mainnet
+  }
+}
+
+function buildAnchor(anchorUrl?: string, anchorHash?: string) {
+  if (anchorUrl && anchorHash) {
+    return { anchorUrl, anchorDataHash: anchorHash } as const;
+  }
+  return undefined;
+}
+
+async function createTxContext(wallet: ConnectedWallet) {
+  const networkId = await wallet.wallet.getNetworkId();
+  const koiosNetwork = resolveKoiosNetwork(networkId);
+  const koiosApiKey = process.env.NEXT_PUBLIC_KOIOS_API_KEY;
+  if (!koiosApiKey) {
+    throw new Error('Koios API key is not set. Please define NEXT_PUBLIC_KOIOS_API_KEY in your environment variables.');
   }
 
-  // Get UTXOs and change address
+  const provider = new KoiosProvider(koiosNetwork, koiosApiKey);
+  const txBuilder = new MeshTxBuilder({ fetcher: provider, verbose: true });
   const utxos = await wallet.wallet.getUtxos();
   const changeAddress = await wallet.wallet.getChangeAddress();
-  console.log('Utxo',utxos);
-  console.log('address',changeAddress)
-    // Get network from wallet
-    const networkId = await wallet.wallet.getNetworkId();
-    let koiosNetwork: 'api' | 'preview' | 'preprod' | 'guild';
-    switch (networkId) {
-      case 0:
-        koiosNetwork = 'preview'; // testnet
-        break;
-      case 1:
-      default:
-        koiosNetwork = 'api'; // mainnet (default)
-        break;
-    }
+  const dRep = await wallet.wallet.getDRep();
+  const dRepId = dRep.dRepIDCip105;
 
-    // Ensure Koios API key is defined
-    const koiosApiKey = process.env.NEXT_PUBLIC_KOIOS_API_KEY;
-    
-    if (!koiosApiKey) {
-      throw new Error('Koios API key is not set. Please define NEXT_PUBLIC_KOIOS_API_KEY in your environment variables.');
-    }
+  return { txBuilder, utxos, changeAddress, dRepId };
+}
 
-    // Build transaction using MeshTxBuilder and KoiosProvider
-    const provider = new KoiosProvider(
-      koiosNetwork,
-      koiosApiKey
-    );
-    const txBuilder = new MeshTxBuilder({ fetcher: provider, verbose: true });
-    console.log('txBuilder',txBuilder);
-  // Only include anchor fields if both are valid
-  const certOptions: any = {};
-  if (registrationData.anchorUrl && registrationData.anchorHash) {
-    txBuilder
-    .drepRegistrationCertificate(dRepId, {
-      anchorUrl: registrationData.anchorUrl,
-      anchorDataHash: registrationData.anchorHash,
-    })
-    .changeAddress(changeAddress)
-    .selectUtxosFrom(utxos);
-    }
-  // Do NOT add an 'anchor' property if either is missing
-
-  txBuilder.drepRegistrationCertificate(dRepId)
-    .changeAddress(changeAddress)
-    .selectUtxosFrom(utxos);
-
-  // Build, sign, and submit
+async function finalizeAndSubmit(
+  txBuilder: MeshTxBuilder,
+  wallet: ConnectedWallet,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  // eslint-disable-next-line no-console
+  console.log('[gov] stage: building');
+  onStageChange?.('building');
   const unsignedTx = await txBuilder.complete();
+
+  // eslint-disable-next-line no-console
+  console.log('[gov] stage: signing');
+  onStageChange?.('signing');
   const signedTx = await wallet.wallet.signTx(unsignedTx);
-  const txHash = await wallet.wallet.submitTx(signedTx);
-  return txHash;
+
+  // eslint-disable-next-line no-console
+  console.log('[gov] stage: submitting');
+  onStageChange?.('submitting');
+  return wallet.wallet.submitTx(signedTx);
+}
+
+export async function submitDRepRegistrationTransaction(
+  wallet: ConnectedWallet,
+  registrationData: DRepRegistrationData,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  const { txBuilder, utxos, changeAddress, dRepId } = await createTxContext(wallet);
+
+  const anchor = buildAnchor(registrationData.anchorUrl, registrationData.anchorHash);
+  if (anchor) {
+    txBuilder.drepRegistrationCertificate(dRepId, anchor);
+  } else {
+    txBuilder.drepRegistrationCertificate(dRepId);
+  }
+
+  txBuilder.changeAddress(changeAddress).selectUtxosFrom(utxos);
+  return finalizeAndSubmit(txBuilder, wallet, onStageChange);
+}
+
+export async function submitDRepUpdateTransaction(
+  wallet: ConnectedWallet,
+  updateData: DRepUpdateData,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  const { txBuilder, utxos, changeAddress, dRepId } = await createTxContext(wallet);
+
+  const anchor = buildAnchor(updateData.anchorUrl, updateData.anchorHash);
+  if (anchor) {
+    txBuilder.drepUpdateCertificate(dRepId, anchor);
+  } else {
+    txBuilder.drepUpdateCertificate(dRepId);
+  }
+
+  txBuilder.changeAddress(changeAddress).selectUtxosFrom(utxos);
+  return finalizeAndSubmit(txBuilder, wallet, onStageChange);
+}
+
+export async function submitDRepRetirementTransaction(
+  wallet: ConnectedWallet,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  const { txBuilder, utxos, changeAddress, dRepId } = await createTxContext(wallet);
+  txBuilder.drepDeregistrationCertificate(dRepId);
+  txBuilder.changeAddress(changeAddress).selectUtxosFrom(utxos);
+  return finalizeAndSubmit(txBuilder, wallet, onStageChange);
 }
 

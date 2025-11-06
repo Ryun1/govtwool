@@ -19,7 +19,7 @@ export default function Navigation() {
     { href: '/dreps', label: 'DReps', icon: '👥' },
     { href: '/actions', label: 'Actions', icon: '📋' },
     { href: '/delegate', label: 'Delegate', icon: '🗳️' },
-    { href: '/register-drep', label: 'Register', icon: '➕' },
+  { href: '/register-drep', label: 'My DRep', icon: '➕' },
   ];
 
   return (
