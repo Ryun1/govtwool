@@ -7,12 +7,19 @@ import { Wallet, LogOut, Loader2 } from 'lucide-react';
 export function WalletConnect() {
   const { connectedWallet, availableWallets, isConnecting, connect, disconnect } = useWalletContext();
   const [showMenu, setShowMenu] = useState(false);
+  
+  const toggleMenu = (next?: boolean) => {
+    const newState = typeof next === 'boolean' ? next : !showMenu;
+    // eslint-disable-next-line no-console
+    console.log('[wallet-ui] toggle wallet menu ->', newState);
+    setShowMenu(newState);
+  };
 
   if (connectedWallet) {
     return (
       <div className="relative">
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          onClick={() => toggleMenu()}
           className="flex items-center space-x-2 bg-sky-blue text-white px-4 py-2 rounded-md hover:bg-sky-dark transition-colors min-h-[44px]"
           aria-label="Open wallet menu"
           aria-expanded={showMenu}
@@ -33,7 +40,7 @@ export function WalletConnect() {
           <>
             <div
               className="fixed inset-0 z-40"
-              onClick={() => setShowMenu(false)}
+              onClick={() => toggleMenu(false)}
               aria-hidden="true"
             />
             <div 
@@ -52,8 +59,10 @@ export function WalletConnect() {
               </div>
               <button
                 onClick={() => {
+                  // eslint-disable-next-line no-console
+                  console.log('[wallet-ui] disconnect clicked');
                   disconnect();
-                  setShowMenu(false);
+                  toggleMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-destructive hover:bg-muted flex items-center space-x-2 min-h-[44px]"
                 role="menuitem"
@@ -85,7 +94,7 @@ export function WalletConnect() {
   return (
     <div className="relative">
       <button
-        onClick={() => setShowMenu(!showMenu)}
+  onClick={() => toggleMenu()}
         disabled={isConnecting}
         className="flex items-center space-x-2 bg-sky-blue text-white px-4 py-2 rounded-md hover:bg-sky-dark transition-colors disabled:opacity-50 min-h-[44px]"
         aria-label={isConnecting ? "Connecting wallet..." : "Open wallet connection menu"}
@@ -114,7 +123,7 @@ export function WalletConnect() {
         <>
           <div
             className="fixed inset-0 z-40"
-            onClick={() => setShowMenu(false)}
+            onClick={() => toggleMenu(false)}
             aria-hidden="true"
           />
           <div 
@@ -128,8 +137,10 @@ export function WalletConnect() {
                 <button
                   key={walletName}
                   onClick={() => {
+                    // eslint-disable-next-line no-console
+                    console.log('[wallet-ui] connect clicked for', walletName);
                     connect(walletName);
-                    setShowMenu(false);
+                    toggleMenu(false);
                   }}
                   className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted rounded-md capitalize min-h-[44px] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   role="menuitem"

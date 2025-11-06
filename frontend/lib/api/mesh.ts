@@ -17,6 +17,20 @@ export function getAvailableWallets(): WalletName[] {
   
   const available: WalletName[] = [];
   const cardanoWindow = window as unknown as CardanoWindow;
+  try {
+    // Debug: Inspect window.cardano presence and keys
+    const hasCardano = Boolean((cardanoWindow as any).cardano);
+    // eslint-disable-next-line no-console
+    console.log('[wallet] cardano provider present:', hasCardano);
+    if (hasCardano) {
+      const keys = Object.keys((cardanoWindow as any).cardano || {});
+      // eslint-disable-next-line no-console
+      console.log('[wallet] discovered providers:', keys);
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.log('[wallet] error inspecting window.cardano', e);
+  }
   
   if (cardanoWindow.cardano) {
     if (cardanoWindow.cardano.nami) available.push('nami');
@@ -30,6 +44,8 @@ export function getAvailableWallets(): WalletName[] {
     if (cardanoWindow.cardano.vespr) available.push('vespr');
     if (cardanoWindow.cardano.yoroi) available.push('yoroi');
   }
+  // eslint-disable-next-line no-console
+  console.log('[wallet] available wallets:', available);
   
   return available;
 }
@@ -39,6 +55,8 @@ export function getAvailableWallets(): WalletName[] {
  */
 export async function connectWallet(walletName: WalletName): Promise<ConnectedWallet | null> {
   try {
+    // eslint-disable-next-line no-console
+    console.log('[wallet] connectWallet start:', walletName);
     if (typeof window === 'undefined') {
       throw new Error('Cardano wallet not found');
     }
@@ -53,8 +71,12 @@ export async function connectWallet(walletName: WalletName): Promise<ConnectedWa
       throw new Error(`Wallet ${walletName} not found`);
     }
 
-    const wallet = await BrowserWallet.enable(walletName);
+    const wallet = await BrowserWallet.enable(walletName, [{ cip: 95 }]);
+    // eslint-disable-next-line no-console
+    console.log('[wallet] enabled provider:', walletName);
     const addresses = await wallet.getUsedAddresses();
+    // eslint-disable-next-line no-console
+    console.log('[wallet] used addresses length:', addresses?.length);
     const address = addresses[0];
     
     // Try to get stake address
@@ -62,10 +84,16 @@ export async function connectWallet(walletName: WalletName): Promise<ConnectedWa
     try {
       const rewardAddresses = await wallet.getRewardAddresses();
       stakeAddress = rewardAddresses[0];
+      // eslint-disable-next-line no-console
+      console.log('[wallet] reward addresses length:', rewardAddresses?.length);
     } catch (e) {
       // Not all wallets support stake addresses
+      // eslint-disable-next-line no-console
+      console.warn('[wallet] getRewardAddresses failed (non-fatal):', e);
     }
 
+    // eslint-disable-next-line no-console
+    console.log('[wallet] connectWallet success:', { walletName, hasAddress: Boolean(address), hasStake: Boolean(stakeAddress) });
     return {
       name: walletName,
       wallet,
@@ -73,7 +101,7 @@ export async function connectWallet(walletName: WalletName): Promise<ConnectedWa
       stakeAddress,
     };
   } catch (error) {
-    console.error('Error connecting wallet:', error);
+    console.error('[wallet] Error connecting wallet:', error);
     return null;
   }
 }
@@ -83,11 +111,15 @@ export async function connectWallet(walletName: WalletName): Promise<ConnectedWa
  */
 export async function disconnectWallet(wallet: any): Promise<void> {
   try {
+    // eslint-disable-next-line no-console
+    console.log('[wallet] disconnectWallet start');
     if (wallet && typeof wallet.disconnect === 'function') {
       await wallet.disconnect();
     }
+    // eslint-disable-next-line no-console
+    console.log('[wallet] disconnectWallet complete');
   } catch (error) {
-    console.error('Error disconnecting wallet:', error);
+    console.error('[wallet] Error disconnecting wallet:', error);
   }
 }
 

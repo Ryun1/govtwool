@@ -12,7 +12,11 @@ export function useWallet() {
   useEffect(() => {
     // Check for available wallets on mount
     if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('[wallet] useWallet mount');
       const wallets = getAvailableWallets();
+      // eslint-disable-next-line no-console
+      console.log('[wallet] useWallet availableWallets:', wallets);
       setAvailableWallets(wallets);
       
       // Check for persisted wallet connection
@@ -20,8 +24,12 @@ export function useWallet() {
       if (savedWallet) {
         try {
           const walletData = JSON.parse(savedWallet);
+          // eslint-disable-next-line no-console
+          console.log('[wallet] found persisted wallet preference:', walletData);
           // Note: Wallet connection needs to be re-established on page load
         } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[wallet] failed to parse persisted wallet preference, clearing');
           localStorage.removeItem('connectedWallet');
         }
       }
@@ -37,21 +45,31 @@ export function useWallet() {
       if (wallet) {
         setConnectedWallet(wallet);
         localStorage.setItem('connectedWallet', JSON.stringify({ name: walletName }));
+        // eslint-disable-next-line no-console
+        console.log('[wallet] connect() success', { name: wallet.name, address: wallet.address });
       } else {
         setError('Failed to connect wallet');
       }
     } catch (err: any) {
+      // eslint-disable-next-line no-console
+      console.error('[wallet] connect() error:', err);
       setError(err.message || 'Failed to connect wallet');
     } finally {
       setIsConnecting(false);
+      // eslint-disable-next-line no-console
+      console.log('[wallet] connect() finished');
     }
   }, []);
 
   const disconnect = useCallback(async () => {
+    // eslint-disable-next-line no-console
+    console.log('[wallet] disconnect() requested');
     if (connectedWallet) {
       await disconnectWallet(connectedWallet.wallet);
       setConnectedWallet(null);
       localStorage.removeItem('connectedWallet');
+      // eslint-disable-next-line no-console
+      console.log('[wallet] disconnect() complete');
     }
   }, [connectedWallet]);
 

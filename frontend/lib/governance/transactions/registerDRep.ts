@@ -1,5 +1,5 @@
-import { Transaction } from '@meshsdk/core';
 import type { ConnectedWallet } from '@/lib/api/mesh';
+import { KoiosProvider, MeshTxBuilder } from '@meshsdk/core';
 
 export interface DRepRegistrationData {
   metadataUrl?: string;
@@ -7,44 +7,115 @@ export interface DRepRegistrationData {
   anchorHash?: string;
 }
 
-/**
- * Build a transaction to register as a DRep
- */
-export async function buildDRepRegistrationTransaction(
-  wallet: ConnectedWallet,
-  registrationData: DRepRegistrationData
-): Promise<Transaction> {
-  const tx = new Transaction({ initiator: wallet.wallet });
-  
-  // Register as DRep
-  // Note: This is a simplified version - actual implementation depends on
-  // Mesh SDK's governance transaction APIs
-  // The exact API may vary, but the pattern is:
-  // tx.registerDRep(metadataUrl, anchorUrl, anchorHash)
-  
-  // For now, we'll use a placeholder structure
-  // In production, you would use Mesh SDK's governance transaction builder
-  // Example: await tx.registerDRep(registrationData.metadataUrl, ...);
-  
-  return tx;
+export interface DRepUpdateData {
+  anchorUrl?: string;
+  anchorHash?: string;
 }
 
-/**
- * Sign and submit a DRep registration transaction
- */
+export type GovernanceTransactionStage = 'building' | 'signing' | 'submitting';
+export type StageChangeCallback = (stage: GovernanceTransactionStage) => void;
+
+type KoiosNetwork = 'api' | 'preview' | 'preprod' | 'guild';
+
+function resolveKoiosNetwork(networkId: number): KoiosNetwork {
+  switch (networkId) {
+    case 0:
+      return 'preview'; // testnet (note: consider preprod detection if needed)
+    case 1:
+    default:
+      return 'api'; // mainnet
+  }
+}
+
+function buildAnchor(anchorUrl?: string, anchorHash?: string) {
+  if (anchorUrl && anchorHash) {
+    return { anchorUrl, anchorDataHash: anchorHash } as const;
+  }
+  return undefined;
+}
+
+async function createTxContext(wallet: ConnectedWallet) {
+  const networkId = await wallet.wallet.getNetworkId();
+  const koiosNetwork = resolveKoiosNetwork(networkId);
+  const koiosApiKey = process.env.NEXT_PUBLIC_KOIOS_API_KEY;
+  if (!koiosApiKey) {
+    throw new Error('Koios API key is not set. Please define NEXT_PUBLIC_KOIOS_API_KEY in your environment variables.');
+  }
+
+  const provider = new KoiosProvider(koiosNetwork, koiosApiKey);
+  const txBuilder = new MeshTxBuilder({ fetcher: provider, verbose: true });
+  const utxos = await wallet.wallet.getUtxos();
+  const changeAddress = await wallet.wallet.getChangeAddress();
+  const dRep = await wallet.wallet.getDRep();
+  const dRepId = dRep.dRepIDCip105;
+
+  return { txBuilder, utxos, changeAddress, dRepId };
+}
+
+async function finalizeAndSubmit(
+  txBuilder: MeshTxBuilder,
+  wallet: ConnectedWallet,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  // eslint-disable-next-line no-console
+  console.log('[gov] stage: building');
+  onStageChange?.('building');
+  const unsignedTx = await txBuilder.complete();
+
+  // eslint-disable-next-line no-console
+  console.log('[gov] stage: signing');
+  onStageChange?.('signing');
+  const signedTx = await wallet.wallet.signTx(unsignedTx);
+
+  // eslint-disable-next-line no-console
+  console.log('[gov] stage: submitting');
+  onStageChange?.('submitting');
+  return wallet.wallet.submitTx(signedTx);
+}
+
 export async function submitDRepRegistrationTransaction(
   wallet: ConnectedWallet,
-  registrationData: DRepRegistrationData
+  registrationData: DRepRegistrationData,
+  onStageChange?: StageChangeCallback
 ): Promise<string> {
-  const tx = await buildDRepRegistrationTransaction(wallet, registrationData);
-  
-  // Build and sign the transaction
-  const unsignedTx = await tx.build();
-  const signedTx = await wallet.wallet.signTx(unsignedTx);
-  
-  // Submit the transaction
-  const txHash = await wallet.wallet.submitTx(signedTx);
-  
-  return txHash;
+  const { txBuilder, utxos, changeAddress, dRepId } = await createTxContext(wallet);
+
+  const anchor = buildAnchor(registrationData.anchorUrl, registrationData.anchorHash);
+  if (anchor) {
+    txBuilder.drepRegistrationCertificate(dRepId, anchor);
+  } else {
+    txBuilder.drepRegistrationCertificate(dRepId);
+  }
+
+  txBuilder.changeAddress(changeAddress).selectUtxosFrom(utxos);
+  return finalizeAndSubmit(txBuilder, wallet, onStageChange);
+}
+
+export async function submitDRepUpdateTransaction(
+  wallet: ConnectedWallet,
+  updateData: DRepUpdateData,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  const { txBuilder, utxos, changeAddress, dRepId } = await createTxContext(wallet);
+
+  const anchor = buildAnchor(updateData.anchorUrl, updateData.anchorHash);
+  if (anchor) {
+    txBuilder.drepUpdateCertificate(dRepId, anchor);
+  } else {
+    txBuilder.drepUpdateCertificate(dRepId);
+  }
+
+  txBuilder.changeAddress(changeAddress).selectUtxosFrom(utxos);
+  return finalizeAndSubmit(txBuilder, wallet, onStageChange);
+}
+
+export async function submitDRepRetirementTransaction(
+  wallet: ConnectedWallet,
+  onStageChange?: StageChangeCallback
+): Promise<string> {
+  const { txBuilder, utxos, changeAddress, dRepId } = await createTxContext(wallet);
+  txBuilder.drepDeregistrationCertificate(dRepId);
+  txBuilder.changeAddress(changeAddress).selectUtxosFrom(utxos);
+  return finalizeAndSubmit(txBuilder, wallet, onStageChange);
 }
 
