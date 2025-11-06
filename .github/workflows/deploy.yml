@@ -1,21 +1,18 @@
 name: Deploy
 
 on:
+  push:
+    branches:
+      - main # Auto-deploy on pushes to main
   workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to deploy to'
         required: true
-        default: 'staging'
+        default: 'production'
         type: choice
         options:
-          - staging
           - production
-  push:
-    branches:
-      - main # Only trigger on pushes to main branch
-    tags:
-      - 'v*.*.*' # Trigger on version tags like v1.0.0
 
 # Prevent concurrent deployments
 concurrency:
@@ -23,13 +20,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to ${{ github.event.inputs.environment || 'production' }}
+  deploy-frontend:
+    name: Deploy Frontend to Vercel
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
+    environment: production
     
-    # Only deploy from main branch
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📥 Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: 🚀 Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        id: vercel-deploy
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: 'deploy --prod --yes'
+          working-directory: frontend
+
+      - name: ✅ Frontend Deployment Summary
+        run: |
+          echo "## 🚀 Frontend Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: Vercel" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Deployed successfully" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.vercel-deploy.outputs.preview-url }}" ]; then
+            echo "- **Preview URL**: ${{ steps.vercel-deploy.outputs.preview-url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  deploy-backend:
+    name: Deploy Backend to Render
+    runs-on: ubuntu-latest
+    environment: production
     
     steps:
       - name: 📥 Checkout repository
@@ -39,7 +74,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          components: clippy
 
       - name: 💾 Cache Rust dependencies
         uses: actions/cache@v4
@@ -50,79 +84,59 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             backend/target/
-          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-rust-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rust-
 
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: 📥 Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: 🦀 Build Rust backend
+      - name: 🔍 Verify backend builds
         working-directory: backend
         env:
           BLOCKFROST_API_KEY: ${{ secrets.BLOCKFROST_API_KEY }}
           BLOCKFROST_NETWORK: ${{ secrets.BLOCKFROST_NETWORK || 'mainnet' }}
           KOIOS_BASE_URL: ${{ secrets.KOIOS_BASE_URL || 'https://preview.koios.rest/api/v1' }}
-        run: cargo build --release
+        run: cargo check --all-targets
 
-      - name: 🏗️ Build project
-        working-directory: frontend
-        env:
-          BLOCKFROST_API_KEY: ${{ secrets.BLOCKFROST_API_KEY }}
-          BLOCKFROST_NETWORK: ${{ secrets.BLOCKFROST_NETWORK || 'mainnet' }}
-          # Add other environment variables as needed
-        run: npm run build
-
-      - name: 📦 Build artifacts
-        run: |
-          mkdir -p deployment
-          cp -r frontend/.next deployment/
-          cp -r frontend/public deployment/ 2>/dev/null || true
-          cp frontend/package.json deployment/
-          cp frontend/package-lock.json deployment/
-          mkdir -p deployment/backend
-          cp backend/target/release/govtwool-backend deployment/backend/ 2>/dev/null || true
-          cp backend/Cargo.toml deployment/backend/ 2>/dev/null || true
-
-      - name: 📤 Upload deployment artifacts
-        uses: actions/upload-artifact@v4
+      - name: 🚀 Trigger Render Deployment
+        uses: johnbeynon/render-deploy-action@v0.0.8
         with:
-          name: deployment-${{ github.event.inputs.environment || 'production' }}
-          path: deployment
-          retention-days: 30
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
 
-      # Add deployment steps here based on your hosting provider
-      # Examples:
-      
-      # For Vercel:
-      # - name: Deploy to Vercel
-      #   uses: amondnet/vercel-action@v25
-      #   with:
-      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
-      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-      
-      # For Netlify:
-      # - name: Deploy to Netlify
-      #   uses: netlify/actions/cli@master
-      #   with:
-      #     args: deploy --dir=.next --prod
-      #   env:
-      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      #     NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-
-      - name: ✅ Deployment summary
+      - name: ✅ Backend Deployment Summary
         run: |
-          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "## 🦀 Backend Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: Render" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Deployment triggered successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: Render deployments may take a few minutes to complete. Check the Render dashboard for deployment status." >> $GITHUB_STEP_SUMMARY
+
+  deployment-complete:
+    name: Deployment Complete
+    runs-on: ubuntu-latest
+    needs: [deploy-frontend, deploy-backend]
+    if: always()
+    
+    steps:
+      - name: 📊 Deployment Status
+        run: |
+          echo "## 🎉 Deployment Pipeline Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend (Vercel)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.deploy-frontend.result }}" == "success" ]; then
+            echo "✅ **Status**: Deployed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status**: Deployment failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend (Render)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.deploy-backend.result }}" == "success" ]; then
+            echo "✅ **Status**: Deployment triggered successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status**: Deployment failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
