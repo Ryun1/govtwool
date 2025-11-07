@@ -47,7 +47,11 @@ async function createTxContext(wallet: ConnectedWallet) {
   const utxos = await wallet.wallet.getUtxos();
   const changeAddress = await wallet.wallet.getChangeAddress();
   const dRep = await wallet.wallet.getDRep();
-  const dRepId = dRep.dRepIDCip105;
+  const dRepId = dRep?.dRepIDCip105;
+
+  if (!dRepId) {
+    throw new Error('Unable to retrieve DRep ID from connected wallet. Please ensure the wallet supports CIP-105 identifiers.');
+  }
 
   return { txBuilder, utxos, changeAddress, dRepId };
 }

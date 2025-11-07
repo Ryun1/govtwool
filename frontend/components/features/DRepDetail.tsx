@@ -8,13 +8,35 @@ import { Button } from '../ui/Button';
 import { ExternalLink, TrendingUp, Calendar, Hash, User, Mail, Globe, FileText, Users, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
-import type { DRep, DRepVotingHistory, DRepDelegator } from '@/types/governance';
+import type { DRep, DRepVotingHistory, DRepDelegator, JsonValue } from '@/types/governance';
 
 interface DRepDetailProps {
   drep: DRep;
   votingHistory: DRepVotingHistory[];
   delegators?: DRepDelegator[];
 }
+
+const getStringValue = (value: JsonValue | undefined): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+const toDisplayString = (value: JsonValue | undefined): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => toDisplayString(item))
+      .filter((part): part is string => Boolean(part && part.trim().length > 0));
+    return parts.length > 0 ? parts.join('\n') : null;
+  }
+  return JSON.stringify(value, null, 2);
+};
 
 function formatVotingPower(power: string | undefined): string {
   if (!power) return '0 ₳';
@@ -37,17 +59,29 @@ function formatVoteCount(vote: 'yes' | 'no' | 'abstain'): string {
 export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRepDetailProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
-  
+
+  const metadataName = getStringValue(drep.metadata?.name);
+  const metadataTitle = getStringValue(drep.metadata?.title);
+  const metadataDescription = toDisplayString(drep.metadata?.description);
+  const metadataObjectives = toDisplayString(drep.metadata?.objectives);
+  const metadataMotivations = toDisplayString(drep.metadata?.motivations);
+  const metadataQualifications = toDisplayString(drep.metadata?.qualifications);
+  const metadataEmail = getStringValue(drep.metadata?.email);
+  const metadataWebsite = getStringValue(drep.metadata?.website);
+  const metadataTwitter = getStringValue(drep.metadata?.twitter);
+  const metadataGithub = getStringValue(drep.metadata?.github);
+
+  const logoUrl =
+    getStringValue(drep.metadata?.logo) ??
+    getStringValue(drep.metadata?.image) ??
+    getStringValue(drep.metadata?.picture);
+  const resolvedLogoUrl = logoUrl && !logoFailed ? logoUrl : undefined;
+  const showLogo = Boolean(resolvedLogoUrl);
+
   // Use name from metadata endpoint (rich metadata), fallback to view, then drep_id
   // Priority: metadata.name > metadata.title > view > drep_id
-  const drepName = drep.metadata?.name || 
-                   drep.metadata?.title || 
-                   drep.view || 
-                   drep.drep_id.slice(0, 8);
+  const drepName = metadataName || metadataTitle || drep.view || drep.drep_id.slice(0, 8);
   const status = drep.status || 'active';
-  const hasLogo = !!(drep.metadata?.logo || drep.metadata?.image || drep.metadata?.picture);
-  const logoUrl = drep.metadata?.logo || drep.metadata?.image || drep.metadata?.picture;
-  const showLogo = hasLogo && typeof logoUrl === 'string' && !logoFailed;
 
   const handleCopyDRepId = async () => {
     try {
@@ -91,7 +125,7 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
                   {showLogo ? (
                     <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-field-green/20 bg-muted">
                       <Image
-                        src={logoUrl}
+                        src={resolvedLogoUrl!}
                         alt={`${drepName} profile picture`}
                         fill
                         className="object-cover"
@@ -114,7 +148,7 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
                     <Badge variant={status === 'active' ? 'success' : status === 'retired' ? 'error' : 'default'}>
                       {status}
                     </Badge>
-                    {drep.metadata?.name && (
+                    {metadataName && (
                       <Badge variant="info" className="text-xs">
                         Verified Profile
                       </Badge>
@@ -127,88 +161,88 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
             <CardContent>
 
               {/* Show detailed CIP-119 fields if available */}
-              {(drep.metadata?.objectives || drep.metadata?.motivations || drep.metadata?.qualifications) && (
+              {(metadataObjectives || metadataMotivations || metadataQualifications) && (
                 <div className="mb-6 space-y-4">
-                  {drep.metadata.objectives && (
+                  {metadataObjectives && (
                     <div>
                       <h2 className="text-lg font-semibold mb-2">Objectives</h2>
-                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{drep.metadata.objectives}</p>
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{metadataObjectives}</p>
                     </div>
                   )}
-                  {drep.metadata.motivations && (
+                  {metadataMotivations && (
                     <div>
                       <h2 className="text-lg font-semibold mb-2">Motivations</h2>
-                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{drep.metadata.motivations}</p>
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{metadataMotivations}</p>
                     </div>
                   )}
-                  {drep.metadata.qualifications && (
+                  {metadataQualifications && (
                     <div>
                       <h2 className="text-lg font-semibold mb-2">Qualifications</h2>
-                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{drep.metadata.qualifications}</p>
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{metadataQualifications}</p>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Fallback to general description if CIP-119 fields not available */}
-              {drep.metadata?.description && !drep.metadata?.objectives && !drep.metadata?.motivations && !drep.metadata?.qualifications && (
+              {metadataDescription && !metadataObjectives && !metadataMotivations && !metadataQualifications && (
                 <div className="mb-6">
                   <h2 className="text-lg font-semibold mb-2">Description</h2>
-                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">{drep.metadata.description}</p>
+                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">{metadataDescription}</p>
                 </div>
               )}
 
               {/* Contact Information */}
-              {(drep.metadata?.email || drep.metadata?.website || drep.metadata?.twitter || drep.metadata?.github) && (
+              {(metadataEmail || metadataWebsite || metadataTwitter || metadataGithub) && (
                 <div className="mb-6">
                   <h2 className="text-lg font-semibold mb-3">Contact Information</h2>
                   <div className="space-y-2">
-                    {drep.metadata?.email && (
+                    {metadataEmail && (
                       <div className="flex items-center gap-2 text-sm">
                         <Mail className="w-4 h-4 text-muted-foreground" />
-                        <a href={`mailto:${drep.metadata.email}`} className="text-primary hover:underline">
-                          {drep.metadata.email}
+                        <a href={`mailto:${metadataEmail}`} className="text-primary hover:underline">
+                          {metadataEmail}
                         </a>
                       </div>
                     )}
-                    {drep.metadata?.website && (
+                    {metadataWebsite && (
                       <div className="flex items-center gap-2 text-sm">
                         <Globe className="w-4 h-4 text-muted-foreground" />
                         <a
-                          href={drep.metadata.website}
+                          href={metadataWebsite}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline flex items-center gap-1"
                         >
-                          <span className="truncate">{drep.metadata.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+                          <span className="truncate">{metadataWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
                           <ExternalLink className="w-3 h-3 shrink-0" />
                         </a>
                       </div>
                     )}
-                    {drep.metadata?.twitter && (
+                    {metadataTwitter && (
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">🐦</span>
                         <a
-                          href={drep.metadata.twitter.startsWith('http') ? drep.metadata.twitter : `https://twitter.com/${drep.metadata.twitter.replace('@', '')}`}
+                          href={metadataTwitter.startsWith('http') ? metadataTwitter : `https://twitter.com/${metadataTwitter.replace('@', '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline flex items-center gap-1"
                         >
-                          {drep.metadata.twitter}
+                          {metadataTwitter}
                           <ExternalLink className="w-3 h-3 shrink-0" />
                         </a>
                       </div>
                     )}
-                    {drep.metadata?.github && (
+                    {metadataGithub && (
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">💻</span>
                         <a
-                          href={drep.metadata.github.startsWith('http') ? drep.metadata.github : `https://github.com/${drep.metadata.github.replace('@', '')}`}
+                          href={metadataGithub.startsWith('http') ? metadataGithub : `https://github.com/${metadataGithub.replace('@', '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline flex items-center gap-1"
                         >
-                          {drep.metadata.github}
+                          {metadataGithub}
                           <ExternalLink className="w-3 h-3 shrink-0" />
                         </a>
                       </div>

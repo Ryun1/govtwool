@@ -15,7 +15,7 @@ type CardanoWindow = Window & {
   cardano?: CardanoProviderMap;
 };
 
-type DisconnectableWallet = {
+type DisconnectableWallet = BrowserWallet | {
   disconnect?: () => Promise<unknown>;
 } | null | undefined;
 
@@ -127,8 +127,11 @@ export async function connectWallet(walletName: WalletName): Promise<ConnectedWa
 export async function disconnectWallet(wallet: DisconnectableWallet): Promise<void> {
   try {
     console.log('[wallet] disconnectWallet start');
-    if (wallet && typeof wallet.disconnect === 'function') {
-      await wallet.disconnect();
+    if (wallet) {
+      const disconnectMethod = (wallet as { disconnect?: () => Promise<unknown> }).disconnect;
+      if (typeof disconnectMethod === 'function') {
+        await disconnectMethod.call(wallet);
+      }
     }
     console.log('[wallet] disconnectWallet complete');
   } catch (error) {

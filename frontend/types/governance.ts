@@ -1,9 +1,11 @@
 // Cardano Governance Types
 
-export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+export type JsonPrimitive = string | number | boolean | null;
+
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 
 export interface JsonObject {
-  [key: string]: JsonValue;
+  [key: string]: JsonValue | undefined;
 }
 
 export interface DRepMetadata extends JsonObject {

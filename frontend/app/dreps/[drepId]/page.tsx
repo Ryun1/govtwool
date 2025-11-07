@@ -143,15 +143,21 @@ export default async function DRepDetailPage({ params }: PageProps) {
   const extractedMetadata = extractCip119Metadata(metadata);
   const combinedMetadata: DRepMetadata = {
     ...(drep.metadata ?? {}),
-    ...(extractedMetadata ?? {}),
   };
 
+  if (extractedMetadata) {
+    Object.entries(extractedMetadata).forEach(([key, value]) => {
+      if (value !== undefined) {
+        combinedMetadata[key as keyof DRepMetadata] = value as DRepMetadata[keyof DRepMetadata];
+      }
+    });
+  }
+
   if (isRecord(metadata) && !isRecord(metadata.json_metadata)) {
-    const rawMetadata = metadata as Record<string, unknown>;
-    Object.entries(rawMetadata).forEach(([key, value]) => {
+    Object.entries(metadata).forEach(([key, value]) => {
       const normalizedValue = getJsonValue(value);
       if (normalizedValue !== undefined) {
-        combinedMetadata[key as keyof DRepMetadata] = normalizedValue as JsonValue;
+        combinedMetadata[key as keyof DRepMetadata] = normalizedValue as DRepMetadata[keyof DRepMetadata];
       }
     });
   }
