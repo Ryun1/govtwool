@@ -40,6 +40,7 @@ export interface DRepMetadata {
 }
 
 export type StorageOption = 'ipfs' | 'custom' | 'none';
+export type IpfsProvider = 'pinata' | 'blockfrost';
 
 interface DRepMetadataFormProps {
   onMetadataCreated: (metadataUrl?: string, metadataHash?: string) => void;
@@ -67,6 +68,8 @@ export default function DRepMetadataForm({
 }: DRepMetadataFormProps) {
   const [step, setStep] = useState<'fields' | 'storage' | 'uploading'>('fields');
   const [storageOption, setStorageOption] = useState<StorageOption>('ipfs');
+  const [ipfsProvider, setIpfsProvider] = useState<IpfsProvider>('pinata');
+  const [ipfsApiKey, setIpfsApiKey] = useState('');
   
   // Form fields
   const [givenName, setGivenName] = useState(initialMetadata?.givenName || '');
@@ -195,22 +198,30 @@ export default function DRepMetadataForm({
     setStep('uploading');
 
     try {
-      // TODO: Replace with actual IPFS upload endpoint
-      // This could be NMKR's IPFS service or your own
+      if (!ipfsApiKey.trim()) {
+        throw new Error('IPFS API key is required');
+      }
+
       const response = await fetch('/api/ipfs/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(metadata),
+        body: JSON.stringify({
+          // Send as object; backend will pretty-print before pinning
+          metadata,
+          provider: ipfsProvider,
+          apiKey: ipfsApiKey,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload to IPFS');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload to IPFS');
       }
 
       const result = await response.json();
-      const ipfsUrl = result.url; // e.g., ipfs://QmHash or https://ipfs.io/ipfs/QmHash
+      const ipfsUrl = result.url; // e.g., ipfs://QmHash
       const hash = result.hash; // blake2b-256 hash
 
       onMetadataCreated(ipfsUrl, hash);
@@ -238,6 +249,10 @@ export default function DRepMetadataForm({
     }
 
     if (storageOption === 'ipfs') {
+      if (!ipfsApiKey.trim()) {
+        setUploadError('Please provide an API key for the selected IPFS provider');
+        return;
+      }
       const metadata = buildMetadataJson();
       await uploadToIpfs(metadata);
     }
@@ -296,7 +311,7 @@ export default function DRepMetadataForm({
                   <p className="font-semibold mb-1">IPFS (Recommended)</p>
                   <p className="text-sm text-muted-foreground">
                     Upload your metadata to IPFS for permanent, decentralized storage. 
-                    Hosted by NMKR.
+                    Choose between Pinata or Blockfrost providers.
                   </p>
                 </div>
               </div>
@@ -377,6 +392,75 @@ export default function DRepMetadataForm({
               >
                 Download JSON Template
               </Button>
+            </div>
+          )}
+
+          {storageOption === 'ipfs' && (
+            <div className="space-y-4 p-4 bg-muted rounded-lg">
+              <div>
+                <label htmlFor="ipfs-provider" className="block text-sm font-medium mb-2">
+                  IPFS Provider *
+                </label>
+                <select
+                  id="ipfs-provider"
+                  value={ipfsProvider}
+                  onChange={(e) => setIpfsProvider(e.target.value as IpfsProvider)}
+                  className="w-full px-4 py-2 border border-input rounded-md bg-background"
+                >
+                  <option value="pinata">Pinata</option>
+                  <option value="blockfrost">Blockfrost</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="ipfs-api-key" className="block text-sm font-medium mb-2">
+                  {ipfsProvider === 'pinata' ? 'Pinata JWT Token' : 'Blockfrost Project ID'} *
+                </label>
+                <input
+                  id="ipfs-api-key"
+                  type="password"
+                  value={ipfsApiKey}
+                  onChange={(e) => setIpfsApiKey(e.target.value)}
+                  placeholder={
+                    ipfsProvider === 'pinata'
+                      ? 'Your Pinata JWT token'
+                      : 'Your Blockfrost IPFS project ID'
+                  }
+                  className="w-full px-4 py-2 border border-input rounded-md bg-background font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {ipfsProvider === 'pinata' ? (
+                    <>
+                      Get your JWT from{' '}
+                      <a
+                        href="https://app.pinata.cloud/developers/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-field-green hover:underline"
+                      >
+                        Pinata Dashboard
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      Get your project ID from{' '}
+                      <a
+                        href="https://blockfrost.io/dashboard"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-field-green hover:underline"
+                      >
+                        Blockfrost Dashboard
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-xs text-blue-900 dark:text-blue-100">
+                  <strong>Note:</strong> Your API key is only used for this upload and is not stored.
+                  Your metadata will be permanently available on IPFS.
+                </p>
+              </div>
             </div>
           )}
 

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import DelegateForm from '@/components/features/DelegateForm';
 import DRepMetadataForm from '@/components/features/DRepMetadataForm';
+import WalletDRepStatus from '@/components/features/WalletDRepStatus';
 import { TransactionModal } from '@/components/features/TransactionModal';
 import { useWalletContext } from '@/components/layout/WalletProvider';
 import { useTransaction } from '@/hooks/useTransaction';
@@ -136,6 +137,14 @@ export default function GovernancePage() {
           Delegate your voting power, register as a DRep, or manage your DRep status
         </p>
       </div>
+
+      {/* Wallet DRep Status Section */}
+      {connectedWallet.stakeAddress && (
+        <WalletDRepStatus 
+          stakeAddress={connectedWallet.stakeAddress} 
+          connectedWallet={connectedWallet}
+        />
+      )}
 
       <Tabs defaultValue="delegate">
         <TabsList>

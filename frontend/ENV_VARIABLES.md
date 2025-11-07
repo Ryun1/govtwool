@@ -11,21 +11,42 @@
 ## Optional Environment Variables
 
 ### 2. `NEXT_PUBLIC_NETWORK` (Optional)
+
 - **Purpose**: Cardano network for client-side components (e.g., explorer URLs)
 - **Used in**: `frontend/components/features/ActionDetail.tsx`
 - **Default**: `mainnet`
 - **Values**: `mainnet` or `preview`
 - **Note**: Used to determine which CardanoScan explorer URL to use
 
+### 3. IPFS Provider API Keys (Optional - For DRep Registration)
+
+Users can provide these keys at registration time, or use the custom URL option. These are not required environment variables but can be provided by users when registering as a DRep.
+
+#### Pinata
+
+- **Purpose**: Upload DRep metadata to IPFS via Pinata
+- **Where to get**: <https://app.pinata.cloud/developers/keys>
+- **Format**: JWT token
+- **Note**: User provides this in the DRep metadata form if they choose Pinata
+
+#### Blockfrost IPFS
+
+- **Purpose**: Upload DRep metadata to IPFS via Blockfrost
+- **Where to get**: <https://blockfrost.io/dashboard> (create IPFS project)
+- **Format**: Project ID (e.g., `ipfsEnrkKWDwlA9hV4IajI4ILrFdsHJpIqNC`)
+- **Note**: User provides this in the DRep metadata form if they choose Blockfrost
+
 ## Summary for Vercel Deployment
 
-### Minimum Required:
-```
+### Minimum Required
+
+```env
 NEXT_PUBLIC_BACKEND_URL=https://your-backend.onrender.com
 ```
 
-### Recommended Configuration:
-```
+### Recommended Configuration
+
+```env
 NEXT_PUBLIC_BACKEND_URL=https://your-backend.onrender.com
 NEXT_PUBLIC_NETWORK=mainnet
 ```
