@@ -3,9 +3,43 @@
 import { useEffect, useRef, useState } from 'react';
 import DRepList from '@/components/features/DRepList';
 import { DRepsSummaryStats } from '@/components/features/DRepsSummaryStats';
-import type { DRep } from '@/types/governance';
+import type { DRep, DRepMetadata, JsonValue } from '@/types/governance';
 
-type MetadataLike = DRep['metadata'] & { body?: any; json_metadata?: any; extra?: any } | any;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const getRecordProperty = (
+  value: Record<string, unknown> | undefined,
+  key: string
+): Record<string, unknown> | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  const nested = value[key];
+  return isRecord(nested) ? nested : undefined;
+};
+
+const getJsonValue = (value: unknown): JsonValue | undefined => {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    const allEntriesValid = value.every((entry) => getJsonValue(entry) !== undefined);
+    return allEntriesValid ? (value as JsonValue) : undefined;
+  }
+  if (isRecord(value)) {
+    const entries = Object.entries(value).map(([entryKey, entryValue]) => [entryKey, getJsonValue(entryValue)]);
+    if (entries.every(([, entryValue]) => entryValue !== undefined)) {
+      return Object.fromEntries(entries) as JsonValue;
+    }
+  }
+  return undefined;
+};
 
 // Helper function to fetch a sample of DReps for summary statistics
 // Only fetch first 100 DReps for stats - much faster than fetching all
@@ -15,17 +49,37 @@ async function fetchDRepsForStats(): Promise<DRep[]> {
     // This is much faster than fetching all pages and provides good enough stats
     const response = await fetch(`/api/dreps?page=1&count=100`);
     if (!response.ok) return [];
-    
-    const data = await response.json();
-    return data.dreps || [];
+
+    const payload: unknown = await response.json();
+    if (isRecord(payload) && Array.isArray(payload.dreps)) {
+      return payload.dreps as DRep[];
+    }
+    return [];
   } catch (error) {
     console.error('Error fetching DReps for stats:', error);
     return [];
   }
 }
 
+async function fetchActiveDRepsCount(): Promise<number | null> {
+  try {
+    const response = await fetch('/api/dreps/stats');
+    if (!response.ok) {
+      return null;
+    }
+    const payload: unknown = await response.json();
+    if (isRecord(payload) && typeof payload.active_dreps_count === 'number') {
+      return payload.active_dreps_count;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching active DRep count:', error);
+    return null;
+  }
+}
+
 export default function DRepsPage() {
-  const metadataCache = useRef<Map<string, DRep['metadata'] | null>>(new Map());
+  const metadataCache = useRef<Map<string, DRepMetadata | null>>(new Map());
   const [dreps, setDReps] = useState<DRep[]>([]);
   const [allDReps, setAllDReps] = useState<DRep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +89,15 @@ export default function DRepsPage() {
   const [hasMore, setHasMore] = useState(false);
   const itemsPerPage = 20;
 
-  const formatImage = (value: any): string | undefined => {
-    if (!value) return undefined;
+  const formatImage = (value: unknown): string | undefined => {
     if (typeof value === 'string') return value;
-    if (typeof value === 'object') {
-      return value.contentUrl || value.url || value.href || value.image || undefined;
+    if (isRecord(value)) {
+      return (
+        getJsonValue(value.contentUrl) as string | undefined ??
+        getJsonValue(value.url) as string | undefined ??
+        getJsonValue(value.href) as string | undefined ??
+        getJsonValue(value.image) as string | undefined
+      );
     }
     return undefined;
   };
@@ -66,66 +124,101 @@ export default function DRepsPage() {
       }
       const decoded = new TextDecoder().decode(byteArray);
       if (!decoded) return null;
-      return JSON.parse(decoded);
+      return JSON.parse(decoded) as unknown;
     } catch (error) {
       console.warn('Failed to decode metadata bytes', error);
       return null;
     }
   };
 
-  const extractProfileFields = (metadata: MetadataLike): DRep['metadata'] | null => {
-    if (!metadata || typeof metadata !== 'object') {
+  const extractProfileFields = (metadata: unknown): DRepMetadata | null => {
+    if (!isRecord(metadata)) {
       return null;
     }
 
-    const collected: Record<string, any> = {};
+    const collected: DRepMetadata = {};
+    const mergeFields = (source: unknown) => {
+      if (!isRecord(source)) return;
 
-    const mergeFields = (source: Record<string, any> | null | undefined) => {
-      if (!source || typeof source !== 'object') return;
-
-      if (typeof source.name === 'string') collected.name = source.name;
-      if (typeof source.title === 'string') collected.title = source.title;
-      if (typeof source.givenName === 'string') {
-        collected.name = collected.name || source.givenName;
-        collected.title = collected.title || source.givenName;
+      const name = getJsonValue(source.name);
+      if (typeof name === 'string') collected.name = name;
+      const title = getJsonValue(source.title);
+      if (typeof title === 'string') collected.title = title;
+      const givenName = getJsonValue(source.givenName);
+      if (typeof givenName === 'string') {
+        collected.name = collected.name || givenName;
+        collected.title = collected.title || givenName;
       }
-      if (typeof source.description === 'string') collected.description = source.description;
-      if (typeof source.abstract === 'string') {
-        collected.description = collected.description || source.abstract;
+      const description = getJsonValue(source.description);
+      if (typeof description === 'string') collected.description = description;
+      const abstractValue = getJsonValue(source.abstract);
+      if (typeof abstractValue === 'string') {
+        collected.description = collected.description || abstractValue;
       }
-      if (typeof source.website === 'string') collected.website = source.website;
-      if (typeof source.url === 'string') {
-        collected.website = collected.website || source.url;
+      const website = getJsonValue(source.website);
+      if (typeof website === 'string') collected.website = website;
+      const url = getJsonValue(source.url);
+      if (typeof url === 'string') {
+        collected.website = collected.website || url;
       }
-      if (typeof source.email === 'string') collected.email = source.email;
-      const image = formatImage(source.image || source.logo || source.picture);
+      const email = getJsonValue(source.email);
+      if (typeof email === 'string') collected.email = email;
+      const image =
+        formatImage(source.image) ??
+        formatImage(source.logo) ??
+        formatImage(source.picture);
       if (image) {
         collected.logo = image;
         collected.image = image;
       }
-      if (typeof source.twitter === 'string') collected.twitter = source.twitter;
-      if (typeof source.github === 'string') collected.github = source.github;
-      if (typeof source.paymentAddress === 'string') collected.paymentAddress = source.paymentAddress;
-      if (typeof source.doNotList === 'boolean') collected.doNotList = source.doNotList;
-      if (source.objectives) collected.objectives = source.objectives;
-      if (source.motivations) collected.motivations = source.motivations;
-      if (source.qualifications) collected.qualifications = source.qualifications;
+      const twitter = getJsonValue(source.twitter);
+      if (typeof twitter === 'string') collected.twitter = twitter;
+      const github = getJsonValue(source.github);
+      if (typeof github === 'string') collected.github = github;
+      const paymentAddress = getJsonValue(source.paymentAddress);
+      if (typeof paymentAddress === 'string') collected.paymentAddress = paymentAddress;
+      const doNotList = getJsonValue(source.doNotList);
+      if (typeof doNotList === 'boolean') collected.doNotList = doNotList;
+      if (source.objectives !== undefined) {
+        const objectives = getJsonValue(source.objectives);
+        if (objectives !== undefined) {
+          collected.objectives = objectives;
+        }
+      }
+      if (source.motivations !== undefined) {
+        const motivations = getJsonValue(source.motivations);
+        if (motivations !== undefined) {
+          collected.motivations = motivations;
+        }
+      }
+      if (source.qualifications !== undefined) {
+        const qualifications = getJsonValue(source.qualifications);
+        if (qualifications !== undefined) {
+          collected.qualifications = qualifications;
+        }
+      }
     };
 
+    const metadataRecord = metadata;
+    const jsonMetadataRecord = getRecordProperty(metadataRecord, 'json_metadata');
+    const extraRecord = getRecordProperty(metadataRecord, 'extra');
+    const extraJsonMetadataRecord = getRecordProperty(extraRecord, 'json_metadata');
+
     const bodyCandidates = [
-      metadata.body,
-      metadata.json_metadata?.body,
-      metadata.extra?.body,
-      metadata.extra?.json_metadata?.body,
+      getRecordProperty(metadataRecord, 'body'),
+      jsonMetadataRecord ? getRecordProperty(jsonMetadataRecord, 'body') : undefined,
+      extraRecord ? getRecordProperty(extraRecord, 'body') : undefined,
+      extraJsonMetadataRecord ? getRecordProperty(extraJsonMetadataRecord, 'body') : undefined,
     ];
 
     bodyCandidates.forEach((candidate) => mergeFields(candidate));
-    mergeFields(metadata);
-    mergeFields(metadata.extra);
-    mergeFields(metadata.json_metadata);
+    mergeFields(metadataRecord);
+    mergeFields(extraRecord);
+    mergeFields(jsonMetadataRecord);
 
-    if ((!collected.name && !collected.title) && typeof metadata.bytes === 'string') {
-      const decoded = decodeMetadataBytes(metadata.bytes);
+    const bytesValue = getJsonValue(metadataRecord.bytes);
+    if ((!collected.name && !collected.title) && typeof bytesValue === 'string') {
+      const decoded = decodeMetadataBytes(bytesValue);
       if (decoded) {
         const decodedResult = extractProfileFields(decoded);
         if (decodedResult) {
@@ -134,13 +227,14 @@ export default function DRepsPage() {
       }
     }
 
-    return Object.keys(collected).length > 0 ? (collected as DRep['metadata']) : null;
+    return Object.keys(collected).length > 0 ? collected : null;
   };
 
-  const hasProfileMetadata = (metadata?: DRep['metadata']) => {
+  const hasProfileMetadata = (metadata?: DRepMetadata) => {
     if (!metadata) return false;
-    return ['name', 'title', 'description', 'website'].some((key) => {
-      const value = metadata[key];
+    const relevantFields: Array<keyof DRepMetadata> = ['name', 'title', 'description', 'website'];
+    return relevantFields.some((field) => {
+      const value = metadata[field];
       if (typeof value === 'string') {
         return value.trim().length > 0;
       }
@@ -164,10 +258,12 @@ export default function DRepsPage() {
     items.map((drep) => {
       const cached = metadataCache.current.get(drep.drep_id);
       if (cached === undefined) {
+        const derived = extractProfileFields(drep.metadata);
+        const metadataToUse = derived ?? drep.metadata ?? undefined;
         return {
           ...drep,
-          metadata: extractProfileFields(drep.metadata) || drep.metadata,
-          has_profile: hasProfileMetadata(drep.metadata),
+          metadata: metadataToUse,
+          has_profile: hasProfileMetadata(metadataToUse),
         };
       }
 
@@ -180,9 +276,9 @@ export default function DRepsPage() {
       }
 
       const mergedMetadata = {
-        ...(extractProfileFields(drep.metadata) || {}),
+        ...(extractProfileFields(drep.metadata) ?? {}),
         ...cached,
-      };
+      } as DRepMetadata;
 
       return {
         ...drep,
@@ -200,13 +296,15 @@ export default function DRepsPage() {
             console.warn(`Failed to fetch metadata for ${drep.drep_id}: ${response.status}`);
             return [drep.drep_id, null] as const;
           }
-          const metadata = await response.json();
-          if (metadata && typeof metadata === 'object') {
-            const extracted = extractProfileFields(metadata);
-            if (extracted && hasProfileMetadata(extracted)) {
-              console.debug('Enriched metadata for DRep', drep.drep_id, extracted?.name || extracted?.title || extracted?.description);
-              return [drep.drep_id, extracted] as const;
-            }
+          const metadataPayload: unknown = await response.json();
+          const extracted = extractProfileFields(metadataPayload);
+          if (extracted && hasProfileMetadata(extracted)) {
+            console.debug(
+              'Enriched metadata for DRep',
+              drep.drep_id,
+              extracted?.name || extracted?.title || extracted?.description
+            );
+            return [drep.drep_id, extracted] as const;
           }
           console.debug('No usable metadata for DRep', drep.drep_id);
           return [drep.drep_id, null] as const;
@@ -232,21 +330,30 @@ export default function DRepsPage() {
         const enrichParam = currentPage === 1 ? '&enrich=true' : '';
         const response = await fetch(`/api/dreps?page=${currentPage}&count=${itemsPerPage}${enrichParam}`);
         if (response.ok) {
-          const data = await response.json();
-          rememberMetadataFrom(data.dreps);
-          const drepsWithCachedMetadata = applyMetadataFromCache(data.dreps);
-          const normalizedHasMore =
-            typeof data.hasMore === 'boolean'
-              ? data.hasMore
-              : typeof data.has_more === 'boolean'
-                ? data.has_more
-                : Boolean(data.hasMore ?? data.has_more);
+          const payload: unknown = await response.json();
+          if (!isRecord(payload) || !Array.isArray(payload.dreps)) {
+            console.error('Unexpected DReps payload format');
+            if (!isCancelled) {
+              setDReps([]);
+              setHasMore(false);
+            }
+            return;
+          }
+
+          const drepsData = payload.dreps as DRep[];
+          rememberMetadataFrom(drepsData);
+          const drepsWithCachedMetadata = applyMetadataFromCache(drepsData);
+          const hasMoreRaw = typeof payload.hasMore === 'boolean' ? payload.hasMore : undefined;
+          const hasMoreAlt = typeof (payload as Record<string, unknown>).has_more === 'boolean'
+            ? ((payload as Record<string, unknown>).has_more as boolean)
+            : undefined;
+          const normalizedHasMore = hasMoreRaw ?? hasMoreAlt ?? false;
           if (!isCancelled) {
             setDReps(drepsWithCachedMetadata);
             setHasMore(normalizedHasMore);
           }
 
-          const drepsNeedingMetadata = data.dreps.filter((drep: DRep) => {
+          const drepsNeedingMetadata = drepsData.filter((drep) => {
             if (metadataCache.current.has(drep.drep_id)) {
               return false;
             }
@@ -273,7 +380,7 @@ export default function DRepsPage() {
             setLoadingAllDReps(true);
             Promise.all([
               fetchDRepsForStats(), // Only fetch first 100 DReps
-              fetch('/api/dreps/stats').then(res => res.json()).then(data => data.active_dreps_count).catch(() => null), // Fetch active DReps count from backend via API route
+              fetchActiveDRepsCount(), // Fetch active DReps count from backend via API route
             ])
               .then(([drepSample, activeCount]) => {
                 console.log(`Loaded ${drepSample.length} DReps for stats`);
@@ -284,12 +391,19 @@ export default function DRepsPage() {
                   setActiveDRepsCount(activeCount);
                   setLoadingAllDReps(false);
                 }
-                const sampleNeedingMetadata = drepSample.filter((drep: DRep) => {
+                const sampleNeedingMetadata = drepSample.filter((drep) => {
                   if (metadataCache.current.has(drep.drep_id)) {
                     return false;
                   }
                   const normalized = extractProfileFields(drep.metadata);
-                  return !hasProfileMetadata(normalized || drep.metadata) || !((normalized || drep.metadata)?.name || (normalized || drep.metadata)?.title);
+                  const metadataToAssess = normalized ?? drep.metadata;
+                  return (
+                    !hasProfileMetadata(metadataToAssess) ||
+                    !(
+                      metadataToAssess?.name ||
+                      metadataToAssess?.title
+                    )
+                  );
                 });
                 if (sampleNeedingMetadata.length > 0) {
                   fetchMissingMetadata(sampleNeedingMetadata)
@@ -307,7 +421,7 @@ export default function DRepsPage() {
                 console.error('Error fetching DReps for stats:', error);
                 // If fetching fails, use the paginated data as fallback
                 if (!isCancelled) {
-                  setAllDReps(applyMetadataFromCache(data.dreps));
+                  setAllDReps(applyMetadataFromCache(drepsData));
                   setLoadingAllDReps(false);
                 }
               });

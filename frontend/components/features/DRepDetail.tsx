@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { VotingPowerChart } from '../charts/VotingPowerChart';
 import { ExternalLink, TrendingUp, Calendar, Hash, User, Mail, Globe, FileText, Users, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
@@ -29,11 +29,6 @@ function formatVotingPower(power: string | undefined): string {
   return `${ada.toFixed(2)} ₳`;
 }
 
-function formatAddress(address: string): string {
-  if (address.length <= 20) return address;
-  return `${address.slice(0, 10)}...${address.slice(-10)}`;
-}
-
 function formatVoteCount(vote: 'yes' | 'no' | 'abstain'): string {
   if (!vote) return 'Unknown';
   return vote.charAt(0).toUpperCase() + vote.slice(1);
@@ -41,6 +36,7 @@ function formatVoteCount(vote: 'yes' | 'no' | 'abstain'): string {
 
 export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRepDetailProps) {
   const [copiedId, setCopiedId] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
   
   // Use name from metadata endpoint (rich metadata), fallback to view, then drep_id
   // Priority: metadata.name > metadata.title > view > drep_id
@@ -51,6 +47,7 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
   const status = drep.status || 'active';
   const hasLogo = !!(drep.metadata?.logo || drep.metadata?.image || drep.metadata?.picture);
   const logoUrl = drep.metadata?.logo || drep.metadata?.image || drep.metadata?.picture;
+  const showLogo = hasLogo && typeof logoUrl === 'string' && !logoFailed;
 
   const handleCopyDRepId = async () => {
     try {
@@ -91,26 +88,15 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
               <div className="flex items-start gap-6 mb-6">
                 {/* Profile Picture Placeholder */}
                 <div className="shrink-0">
-                  {hasLogo && logoUrl ? (
+                  {showLogo ? (
                     <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-field-green/20 bg-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={logoUrl}
                         alt={`${drepName} profile picture`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Fallback to placeholder if image fails to load
-                          const container = e.currentTarget.parentElement;
-                          if (container) {
-                            container.innerHTML = `
-                              <div class="w-full h-full bg-gradient-to-br from-field-green/20 to-sky-blue/20 flex items-center justify-center">
-                                <svg class="w-12 h-12 text-field-green/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                              </div>
-                            `;
-                          }
-                        }}
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                        onError={() => setLogoFailed(true)}
                       />
                     </div>
                   ) : (

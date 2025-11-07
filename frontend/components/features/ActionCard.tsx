@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { memo, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, type KeyboardEvent } from 'react';
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Clock, TrendingUp, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 import type { GovernanceAction } from '@/types/governance';
 import { Markdown } from '../ui/Markdown';
 import { useRouter } from 'next/navigation';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 interface ActionCardProps {
   action: GovernanceAction;
@@ -56,13 +59,17 @@ function formatActionType(type: string | undefined): string {
 /**
  * Extract string from value (handles both string and object formats)
  */
-function extractString(value: any): string | undefined {
+function extractString(value: unknown): string | undefined {
   if (typeof value === 'string') {
     return value;
   }
-  if (typeof value === 'object' && value !== null) {
-    // Try to extract string from object structures
-    return value.content || value.text || value.value || value.description || String(value);
+  if (isRecord(value)) {
+    const candidates: Array<unknown> = [value.content, value.text, value.value, value.description, value.label];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        return candidate;
+      }
+    }
   }
   return undefined;
 }
@@ -74,23 +81,24 @@ function getMetadataTitle(action: GovernanceAction): string {
   // Try meta_json first (handle CIP-100/CIP-108 format)
   if (action.meta_json) {
     try {
-      const parsed = typeof action.meta_json === 'string' 
-        ? JSON.parse(action.meta_json) 
-        : action.meta_json;
-      
-      // Check for CIP-100/CIP-108 format with body structure
-      if (parsed.body && typeof parsed.body === 'object') {
-        const title = extractString(parsed.body.title);
-        if (title) return title;
-        // Fallback to abstract if title not available
-        const abstract = extractString(parsed.body.abstract);
-        if (abstract) return abstract;
-      } else {
-        // Standard format
+      const parsed: unknown =
+        typeof action.meta_json === 'string'
+          ? JSON.parse(action.meta_json)
+          : action.meta_json;
+
+      if (isRecord(parsed)) {
+        const body = isRecord(parsed.body) ? parsed.body : undefined;
+        if (body) {
+          const title = extractString(body.title);
+          if (title) return title;
+          const abstract = extractString(body.abstract);
+          if (abstract) return abstract;
+        }
+
         const title = extractString(parsed.title);
         if (title) return title;
       }
-    } catch (e) {
+    } catch {
       // Ignore parse errors
     }
   }
@@ -119,24 +127,26 @@ function getMetadataDescription(action: GovernanceAction): string | undefined {
   // Try meta_json first (handle CIP-100/CIP-108 format)
   if (action.meta_json) {
     try {
-      const parsed = typeof action.meta_json === 'string' 
-        ? JSON.parse(action.meta_json) 
-        : action.meta_json;
-      
-      // Check for CIP-100/CIP-108 format with body structure
-      if (parsed.body && typeof parsed.body === 'object') {
-        const abstract = extractString(parsed.body.abstract);
-        if (abstract) return abstract;
-        const description = extractString(parsed.body.description);
-        if (description) return description;
-        const rationale = extractString(parsed.body.rationale);
-        if (rationale) return rationale;
-      } else {
-        // Standard format
+      const parsed: unknown =
+        typeof action.meta_json === 'string'
+          ? JSON.parse(action.meta_json)
+          : action.meta_json;
+
+      if (isRecord(parsed)) {
+        const body = isRecord(parsed.body) ? parsed.body : undefined;
+        if (body) {
+          const abstract = extractString(body.abstract);
+          if (abstract) return abstract;
+          const description = extractString(body.description);
+          if (description) return description;
+          const rationale = extractString(body.rationale);
+          if (rationale) return rationale;
+        }
+
         const description = extractString(parsed.description);
         if (description) return description;
       }
-    } catch (e) {
+    } catch {
       // Ignore parse errors
     }
   }

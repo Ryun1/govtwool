@@ -57,17 +57,14 @@ async function finalizeAndSubmit(
   wallet: ConnectedWallet,
   onStageChange?: StageChangeCallback
 ): Promise<string> {
-  // eslint-disable-next-line no-console
   console.log('[gov] stage: building');
   onStageChange?.('building');
   const unsignedTx = await txBuilder.complete();
 
-  // eslint-disable-next-line no-console
   console.log('[gov] stage: signing');
   onStageChange?.('signing');
   const signedTx = await wallet.wallet.signTx(unsignedTx);
 
-  // eslint-disable-next-line no-console
   console.log('[gov] stage: submitting');
   onStageChange?.('submitting');
   return wallet.wallet.submitTx(signedTx);

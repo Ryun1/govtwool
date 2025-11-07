@@ -1,19 +1,40 @@
 // Cardano Governance Types
 
+export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+export interface DRepMetadata extends JsonObject {
+  name?: string;
+  title?: string;
+  email?: string;
+  description?: string;
+  website?: string;
+  logo?: string;
+  image?: string;
+  picture?: string;
+  twitter?: string;
+  github?: string;
+  paymentAddress?: string;
+  doNotList?: boolean;
+  objectives?: JsonValue;
+  motivations?: JsonValue;
+  qualifications?: JsonValue;
+  bytes?: string;
+  body?: JsonObject;
+  extra?: JsonObject;
+  json_metadata?: JsonObject;
+}
+
 export interface DRep {
   drep_id: string;
   drep_hash?: string;
   hex?: string;
   view?: string;
   url?: string;
-  metadata?: {
-    name?: string;
-    email?: string;
-    description?: string;
-    website?: string;
-    logo?: string;
-    [key: string]: any;
-  };
+  metadata?: DRepMetadata;
   anchor?: {
     url: string;
     data_hash: string;
@@ -58,6 +79,15 @@ export interface DRepExternalReference {
   uri?: string;
 }
 
+export interface GovernanceActionMetadata extends JsonObject {
+  title?: JsonValue;
+  description?: JsonValue;
+  abstract?: JsonValue;
+  rationale?: JsonValue;
+  authors?: JsonValue;
+  references?: JsonValue;
+}
+
 export interface GovernanceAction {
   tx_hash: string;
   action_id: string;
@@ -85,7 +115,7 @@ export interface GovernanceAction {
   // Metadata fields
   meta_url?: string;
   meta_hash?: string;
-  meta_json?: any; // Parsed metadata JSON
+  meta_json?: string | JsonObject; // Parsed metadata JSON
   meta_language?: string; // CIP-100 language code
   meta_comment?: string;
   meta_is_valid?: boolean | null;
@@ -95,16 +125,11 @@ export interface GovernanceAction {
     address?: string; // Stake address
   };
   // Parameter proposal (for parameter_change type)
-  param_proposal?: any; // Parameter change object
+  param_proposal?: JsonObject; // Parameter change object
   // Block time
   block_time?: number; // UNIX timestamp
   // Existing metadata structure (for backward compatibility)
-  metadata?: {
-    title?: string;
-    description?: string;
-    rationale?: string;
-    [key: string]: any;
-  };
+  metadata?: GovernanceActionMetadata;
 }
 
 export interface VotingResult {

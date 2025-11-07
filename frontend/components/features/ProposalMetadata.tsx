@@ -6,6 +6,9 @@ import { ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import type { GovernanceAction } from '@/types/governance';
 import { Markdown } from '../ui/Markdown';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 interface ProposalMetadataProps {
   action: GovernanceAction;
 }
@@ -13,13 +16,17 @@ interface ProposalMetadataProps {
 /**
  * Extract string from metadata field (handles both string and object formats)
  */
-function extractString(value: any): string | undefined {
+function extractString(value: unknown): string | undefined {
   if (typeof value === 'string') {
     return value;
   }
-  if (typeof value === 'object' && value !== null) {
-    // Try to extract string from object structures
-    return value.content || value.text || value.value || String(value);
+  if (isRecord(value)) {
+    const candidates: Array<unknown> = [value.content, value.text, value.value, value.description, value.label];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        return candidate;
+      }
+    }
   }
   return undefined;
 }
@@ -29,64 +36,85 @@ function extractString(value: any): string | undefined {
  * Checks meta_json first, then metadata field, then falls back to description
  * Handles CIP-100/CIP-108 format
  */
-function getMetadata(action: GovernanceAction) {
+interface NormalizedMetadata extends Record<string, unknown> {
+  title?: string;
+  abstract?: string;
+  description?: string;
+  motivation?: string;
+  rationale?: string;
+  authors?: unknown;
+  author?: unknown;
+  references?: unknown;
+  links?: unknown;
+  hashAlgorithm?: unknown;
+}
+
+function getMetadata(action: GovernanceAction): NormalizedMetadata {
   // Try meta_json first (from backend)
   if (action.meta_json) {
     try {
-      const parsed = typeof action.meta_json === 'string' 
-        ? JSON.parse(action.meta_json) 
-        : action.meta_json;
-      
-      // Check if this is CIP-100/CIP-108 format with body structure
-      if (parsed.body && typeof parsed.body === 'object') {
-        const body = parsed.body as Record<string, unknown>;
+      const parsed: unknown =
+        typeof action.meta_json === 'string'
+          ? JSON.parse(action.meta_json)
+          : action.meta_json;
+
+      if (isRecord(parsed)) {
+        const body = isRecord(parsed.body) ? parsed.body : undefined;
+        if (body) {
+          return {
+            title: extractString(body.title),
+            abstract: extractString(body.abstract),
+            description: extractString(body.abstract) || extractString(body.description),
+            motivation: extractString(body.motivation),
+            rationale: extractString(body.rationale),
+            authors: body.authors ?? parsed.authors ?? body.author,
+            references: body.references ?? parsed.references,
+            hashAlgorithm: parsed.hashAlgorithm,
+          };
+        }
+
+        const fallbackAuthors =
+          parsed.authors ??
+          parsed.author ??
+          (isRecord(parsed.metadata) ? parsed.metadata.authors : undefined) ??
+          (isRecord(parsed.body) ? parsed.body.authors : undefined);
+        const fallbackReferences =
+          parsed.references ??
+          (isRecord(parsed.body) ? parsed.body.references : undefined) ??
+          (isRecord(parsed.metadata) ? parsed.metadata.references : undefined);
+
         return {
-          title: extractString(body.title),
-          abstract: extractString(body.abstract),
-          description: extractString(body.abstract) || extractString(body.description),
-          motivation: extractString(body.motivation),
-          rationale: extractString(body.rationale),
-          authors: body.authors ?? parsed.authors ?? body.author,
-          references: body.references ?? parsed.references,
-          hashAlgorithm: parsed.hashAlgorithm,
+          ...parsed,
+          title: extractString(parsed.title) || (typeof parsed.title === 'string' ? parsed.title : undefined),
+          description:
+            extractString(parsed.description) ||
+            (typeof parsed.description === 'string' ? parsed.description : undefined),
+          rationale: extractString(parsed.rationale) || (typeof parsed.rationale === 'string' ? parsed.rationale : undefined),
+          authors: fallbackAuthors,
+          references: fallbackReferences,
         };
       }
-
-      const fallbackAuthors =
-        parsed.authors ??
-        parsed.author ??
-        parsed.metadata?.authors ??
-        parsed.body?.authors;
-      const fallbackReferences =
-        parsed.references ??
-        parsed.body?.references ??
-        parsed.metadata?.references;
-
-      // Standard format - ensure fields are strings
-      return {
-        ...parsed,
-        title: extractString(parsed.title) || parsed.title,
-        description: extractString(parsed.description) || parsed.description,
-        rationale: extractString(parsed.rationale) || parsed.rationale,
-        authors: fallbackAuthors,
-        references: fallbackReferences,
-      };
-    } catch (e) {
-      console.warn('Failed to parse meta_json:', e);
+    } catch (error) {
+      console.warn('Failed to parse meta_json:', error);
     }
   }
 
   // Try metadata field (already normalized from CIP-100/CIP-108 if applicable)
   if (action.metadata) {
-    return {
-      ...action.metadata,
-      title: extractString(action.metadata.title) || action.metadata.title,
-      abstract: extractString(action.metadata.abstract) || action.metadata.abstract,
-      description: extractString(action.metadata.description) || extractString(action.metadata.abstract) || action.metadata.description,
-      rationale: extractString(action.metadata.rationale) || action.metadata.rationale,
-      authors: action.metadata.authors,
-      references: action.metadata.references,
+    const metadata = action.metadata;
+    const result: NormalizedMetadata = {
+      ...metadata,
+      title: extractString(metadata.title) || (typeof metadata.title === 'string' ? metadata.title : undefined),
+      abstract: extractString(metadata.abstract) || (typeof metadata.abstract === 'string' ? metadata.abstract : undefined),
+      description:
+        extractString(metadata.description) ||
+        extractString(metadata.abstract) ||
+        (typeof metadata.description === 'string' ? metadata.description : undefined),
+      rationale: extractString(metadata.rationale) || (typeof metadata.rationale === 'string' ? metadata.rationale : undefined),
+      authors: metadata.authors,
+      references: metadata.references,
     };
+    return result;
   }
 
   // Fallback to description
@@ -97,7 +125,7 @@ function getMetadata(action: GovernanceAction) {
 }
 
 type NormalizedReference = {
-  label?: string;
+  label: string;
   uri?: string;
   type?: string;
   description?: string;
@@ -121,16 +149,15 @@ function normalizeAuthors(authors: unknown): string[] {
         if (typeof author === 'string') {
           return author.trim();
         }
-        if (typeof author === 'object') {
-          const record = author as Record<string, unknown>;
+        if (isRecord(author)) {
           const value =
-            extractString(record.name) ??
-            extractString(record.fullName) ??
-            extractString(record.displayName) ??
-            extractString(record.handle) ??
-            extractString(record.title) ??
-            extractString(record.label) ??
-            extractString(record.author);
+            extractString(author.name) ??
+            extractString(author.fullName) ??
+            extractString(author.displayName) ??
+            extractString(author.handle) ??
+            extractString(author.title) ??
+            extractString(author.label) ??
+            extractString(author.author);
           return value?.trim();
         }
         return undefined;
@@ -138,15 +165,14 @@ function normalizeAuthors(authors: unknown): string[] {
       .filter((value): value is string => Boolean(value && value.trim()));
   }
 
-  if (typeof authors === 'object') {
-    const record = authors as Record<string, unknown>;
+  if (isRecord(authors)) {
     const value =
-      extractString(record.name) ??
-      extractString(record.fullName) ??
-      extractString(record.displayName) ??
-      extractString(record.handle) ??
-      extractString(record.title) ??
-      extractString(record.label);
+      extractString(authors.name) ??
+      extractString(authors.fullName) ??
+      extractString(authors.displayName) ??
+      extractString(authors.handle) ??
+      extractString(authors.title) ??
+      extractString(authors.label);
     return value?.trim() ? [value.trim()] : [];
   }
 
@@ -165,18 +191,17 @@ function normalizeReferences(references: unknown): NormalizedReference[] {
     if (Array.isArray(value)) {
       return value;
     }
-    if (typeof value === 'object') {
-      return Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+    if (isRecord(value)) {
+      return Object.entries(value).map(([key, entry]) => {
         if (typeof entry === 'string') {
           return { label: key, uri: entry };
         }
-        if (typeof entry === 'object' && entry !== null) {
-          const entryRecord = entry as Record<string, unknown>;
+        if (isRecord(entry)) {
           return {
-            label: extractString(entryRecord.label) ?? key,
-            uri: extractString(entryRecord.uri) ?? extractString(entryRecord.url),
-            type: extractString(entryRecord['@type']) ?? extractString(entryRecord.type),
-            description: extractString(entryRecord.description),
+            label: extractString(entry.label) ?? key,
+            uri: extractString(entry.uri) ?? extractString(entry.url),
+            type: extractString(entry['@type']) ?? extractString(entry.type),
+            description: extractString(entry.description),
           };
         }
         return { label: key };
@@ -190,38 +215,44 @@ function normalizeReferences(references: unknown): NormalizedReference[] {
       if (!ref) {
         return null;
       }
-      if (typeof ref === 'string') {
-        return { label: ref.trim() };
-      }
-      if (typeof ref === 'object') {
-        const record = ref as Record<string, unknown>;
-        const label =
-          extractString(record.label) ??
-          extractString(record.name) ??
-          extractString(record.title) ??
-          extractString(record.description);
-        const uri =
-          extractString(record.uri) ??
-          extractString(record.url) ??
-          extractString(record.href) ??
-          extractString(record.link);
-        const type = extractString(record['@type']) ?? extractString(record.type);
-        const description = extractString(record.description);
 
-        if (!label && !uri) {
+      if (typeof ref === 'string') {
+        const trimmed = ref.trim();
+        return trimmed ? { label: trimmed } : null;
+      }
+
+      if (isRecord(ref)) {
+        const rawLabel =
+          extractString(ref.label) ??
+          extractString(ref.name) ??
+          extractString(ref.title) ??
+          extractString(ref.description);
+        const rawUri =
+          extractString(ref.uri) ??
+          extractString(ref.url) ??
+          extractString(ref.href) ??
+          extractString(ref.link);
+        const rawType = extractString(ref['@type']) ?? extractString(ref.type);
+        const rawDescription = extractString(ref.description);
+
+        const uri = rawUri?.trim();
+        const label = rawLabel?.trim() ?? uri;
+
+        if (!label) {
           return null;
         }
 
         return {
-          label: label?.trim(),
+          label,
           uri,
-          type: type?.trim(),
-          description: description?.trim(),
+          type: rawType?.trim(),
+          description: rawDescription?.trim(),
         };
       }
+
       return null;
     })
-    .filter((ref): ref is NormalizedReference => Boolean(ref));
+    .filter((ref): ref is NormalizedReference => ref !== null);
 }
 
 function resolveReferenceUri(uri?: string): string | undefined {
@@ -242,7 +273,7 @@ function resolveReferenceUri(uri?: string): string | undefined {
 /**
  * Validate metadata hash if meta_hash is provided
  */
-function validateMetadataHash(metadata: any, metaHash?: string): boolean | null {
+function validateMetadataHash(_metadata: unknown, metaHash?: string): boolean | null {
   if (!metaHash) {
     return null; // No hash provided, can't validate
   }
@@ -254,7 +285,7 @@ function validateMetadataHash(metadata: any, metaHash?: string): boolean | null 
 
 export function ProposalMetadata({ action }: ProposalMetadataProps) {
   const metadata = getMetadata(action);
-  const hasMetadata = !!(metadata?.title || metadata?.description || metadata?.rationale);
+  const hasMetadata = Boolean(metadata.title || metadata.description || metadata.rationale);
   const validationStatus = validateMetadataHash(metadata, action.meta_hash);
   const sections: Array<{ label: string; content: string }> = [];
 
@@ -281,14 +312,8 @@ export function ProposalMetadata({ action }: ProposalMetadataProps) {
   addSection('Description', metadata.description);
   addSection('Rationale', metadata.rationale);
 
-  const authors = normalizeAuthors(
-    (metadata as Record<string, unknown>)?.authors ??
-      (metadata as Record<string, unknown>)?.author
-  );
-  const references = normalizeReferences(
-    (metadata as Record<string, unknown>)?.references ??
-      (metadata as Record<string, unknown>)?.links
-  );
+  const authors = normalizeAuthors(metadata.authors ?? metadata.author);
+  const references = normalizeReferences(metadata.references ?? metadata.links);
 
   if (!hasMetadata) {
     return null;
