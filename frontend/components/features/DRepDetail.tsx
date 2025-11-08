@@ -10,6 +10,11 @@ import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import type { DRep, DRepVotingHistory, DRepDelegator, JsonValue } from '@/types/governance';
 import { SheepIcon } from '@/components/ui/SheepIcon';
+import {
+  getMetadataDescription,
+  getMetadataName,
+  getMetadataWebsite,
+} from '@/lib/governance/drepMetadata';
 
 interface DRepDetailProps {
   drep: DRep;
@@ -61,14 +66,15 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
   const [copiedId, setCopiedId] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
-  const metadataName = getStringValue(drep.metadata?.name);
+  const metadataName = getMetadataName(drep.metadata) ?? getStringValue(drep.metadata?.name);
   const metadataTitle = getStringValue(drep.metadata?.title);
-  const metadataDescription = toDisplayString(drep.metadata?.description);
+  const metadataDescription =
+    getMetadataDescription(drep.metadata) ?? toDisplayString(drep.metadata?.description);
   const metadataObjectives = toDisplayString(drep.metadata?.objectives);
   const metadataMotivations = toDisplayString(drep.metadata?.motivations);
   const metadataQualifications = toDisplayString(drep.metadata?.qualifications);
   const metadataEmail = getStringValue(drep.metadata?.email);
-  const metadataWebsite = getStringValue(drep.metadata?.website);
+  const metadataWebsite = getMetadataWebsite(drep.metadata) ?? getStringValue(drep.metadata?.website);
   const metadataTwitter = getStringValue(drep.metadata?.twitter);
   const metadataGithub = getStringValue(drep.metadata?.github);
 
@@ -81,7 +87,7 @@ export default function DRepDetail({ drep, votingHistory, delegators = [] }: DRe
 
   // Use name from metadata endpoint (rich metadata), fallback to view, then drep_id
   // Priority: metadata.name > metadata.title > view > drep_id
-  const drepName = metadataName || metadataTitle || drep.view || drep.drep_id.slice(0, 8);
+  const drepName = metadataName || metadataTitle || drep.given_name || drep.view || drep.drep_id.slice(0, 8);
   const status = drep.status || 'active';
 
   const handleCopyDRepId = async () => {

@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DRepList from '@/components/features/DRepList';
 import { DRepsSummaryStats } from '@/components/features/DRepsSummaryStats';
-import type { DRep } from '@/types/governance';
+import type { DRep, DRepMetadata } from '@/types/governance';
+import {
+  sanitizeMetadataValue,
+  getMetadataName,
+  getMetadataDescription,
+  getMetadataWebsite,
+} from '@/lib/governance/drepMetadata';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -124,6 +130,7 @@ const fetchActiveDRepsCount = async (): Promise<number | null> => {
 };
 
 export default function DRepsPage() {
+  const metadataCache = useRef<Map<string, DRepMetadata | null>>(new Map());
   const [dreps, setDReps] = useState<DRep[]>([]);
   const [allDReps, setAllDReps] = useState<DRep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,6 +143,110 @@ export default function DRepsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
   const [sortBy, setSortBy] = useState<SortFilter>('VotingPower');
   const [sortDirection, setSortDirection] = useState<SortDirection>('Descending');
+
+  const rememberMetadataFrom = (items: DRep[]) => {
+    items.forEach((drep) => {
+      if (metadataCache.current.has(drep.drep_id)) {
+        return;
+      }
+      if (!drep.metadata) {
+        return;
+      }
+      const sanitized = sanitizeMetadataValue(drep.metadata);
+      if (sanitized) {
+        metadataCache.current.set(drep.drep_id, sanitized);
+      }
+    });
+  };
+
+  const applyMetadataFromCache = (items: DRep[]): DRep[] =>
+    items.map((drep) => {
+      let cached = metadataCache.current.get(drep.drep_id);
+      if (cached === undefined && drep.metadata) {
+        cached = sanitizeMetadataValue(drep.metadata);
+        if (cached) {
+          metadataCache.current.set(drep.drep_id, cached);
+        }
+      }
+
+      const metadataToUse = (cached ?? drep.metadata) as DRepMetadata | undefined;
+      const nameFromMetadata = getMetadataName(metadataToUse);
+      const descriptionFromMetadata = getMetadataDescription(metadataToUse);
+      const websiteFromMetadata = getMetadataWebsite(metadataToUse);
+      const givenName = drep.given_name && drep.given_name.trim().length > 0 ? drep.given_name : nameFromMetadata;
+
+      const hasProfile =
+        drep.has_profile ||
+        Boolean(
+          (givenName && givenName.trim().length > 0) ||
+            descriptionFromMetadata ||
+            websiteFromMetadata ||
+            drep.objectives ||
+            drep.motivations ||
+            drep.qualifications ||
+            (drep.identity_references && drep.identity_references.length > 0) ||
+            (drep.link_references && drep.link_references.length > 0)
+        );
+
+      return {
+        ...drep,
+        metadata: metadataToUse ?? drep.metadata,
+        given_name: givenName ?? drep.given_name,
+        has_profile: hasProfile,
+      };
+    });
+
+  const identifyDRepsNeedingMetadata = (items: DRep[]) =>
+    items
+      .filter((drep) => {
+        if (drep.given_name && drep.given_name.trim().length > 0) {
+          return false;
+        }
+        const cached = metadataCache.current.get(drep.drep_id);
+        if (cached === null) {
+          return false;
+        }
+        if (cached) {
+          return !getMetadataName(cached);
+        }
+        if (drep.metadata) {
+          const sanitized = sanitizeMetadataValue(drep.metadata);
+          if (sanitized) {
+            metadataCache.current.set(drep.drep_id, sanitized);
+            return !getMetadataName(sanitized);
+          }
+        }
+        return true;
+      })
+      .map((drep) => drep.drep_id);
+
+  const fetchMetadataForDReps = async (ids: string[]) => {
+    if (ids.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const response = await fetch(`/api/dreps/${encodeURIComponent(id)}/metadata`);
+          if (!response.ok) {
+            metadataCache.current.set(id, null);
+            return;
+          }
+          const payload: unknown = await response.json();
+          const sanitized = sanitizeMetadataValue(payload);
+          if (sanitized) {
+            metadataCache.current.set(id, sanitized);
+          } else {
+            metadataCache.current.set(id, null);
+          }
+        } catch (error) {
+          console.error('Failed to fetch DRep metadata', id, error);
+          metadataCache.current.set(id, null);
+        }
+      })
+    );
+  };
 
   const queryState: QueryState = {
     page: currentPage,
@@ -158,12 +269,27 @@ export default function DRepsPage() {
         });
 
         if (!isCancelled) {
-          setDReps(pageDReps);
+          rememberMetadataFrom(pageDReps);
+          const appliedPageDReps = applyMetadataFromCache(pageDReps);
+          setDReps(appliedPageDReps);
           setHasMore(pageHasMore);
           setTotalCount(total);
 
+          const missingIds = identifyDRepsNeedingMetadata(appliedPageDReps);
+          fetchMetadataForDReps(missingIds)
+            .then(() => {
+              if (!isCancelled) {
+                setDReps((previous) => applyMetadataFromCache(previous));
+              }
+            })
+            .catch((error) => {
+              console.error('Failed to enrich DRep metadata', error);
+            });
+
           if (currentPage === 1) {
-            setAllDReps(pageDReps);
+            rememberMetadataFrom(pageDReps);
+            const appliedAll = applyMetadataFromCache(pageDReps);
+            setAllDReps(appliedAll);
             setLoadingAllDReps(true);
 
             const statsQuery: QueryState = {
@@ -175,8 +301,21 @@ export default function DRepsPage() {
             Promise.all([fetchDRepsPage(statsQuery), fetchActiveDRepsCount()])
               .then(([sample, activeCount]) => {
                 if (!isCancelled) {
-                  setAllDReps(sample.dreps);
+                  rememberMetadataFrom(sample.dreps);
+                  const appliedSample = applyMetadataFromCache(sample.dreps);
+                  setAllDReps(appliedSample);
                   setActiveDRepsCount(activeCount);
+
+                  const sampleMissing = identifyDRepsNeedingMetadata(appliedSample);
+                  fetchMetadataForDReps(sampleMissing)
+                    .then(() => {
+                      if (!isCancelled) {
+                        setAllDReps((previous) => applyMetadataFromCache(previous));
+                      }
+                    })
+                    .catch((error) => {
+                      console.error('Failed to enrich summary DRep metadata', error);
+                    });
                 }
               })
               .catch((error) => {
@@ -267,4 +406,11 @@ export default function DRepsPage() {
     </div>
   );
 }
+
+export const __drepMetadataUtils = {
+  sanitizeMetadataValue,
+  getMetadataName,
+  getMetadataDescription,
+  getMetadataWebsite,
+};
 
