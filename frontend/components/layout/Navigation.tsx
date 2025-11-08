@@ -18,8 +18,7 @@ export default function Navigation() {
     { href: '/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/dreps', label: 'DReps', icon: '👥' },
     { href: '/actions', label: 'Actions', icon: '📋' },
-    { href: '/delegate', label: 'Delegate', icon: '🗳️' },
-  { href: '/register-drep', label: 'My DRep', icon: '➕' },
+    { href: '/governance', label: 'Governance', icon: '⚖️' },
   ];
 
   return (
