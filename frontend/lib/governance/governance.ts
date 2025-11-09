@@ -480,6 +480,14 @@ export async function getActionVotingResults(actionId: string): Promise<ActionVo
     }
     
     const breakdown: unknown = await response.json();
+    if (!isRecord(breakdown)) {
+      return {
+        drep_votes: { yes: '0', no: '0', abstain: '0' },
+        spo_votes: { yes: '0', no: '0', abstain: '0' },
+        cc_votes: { yes: '0', no: '0', abstain: '0' },
+        total_voting_power: '0',
+      };
+    }
     const parseOptionalNumber = (value: unknown): number | undefined => {
       if (typeof value === 'number' && Number.isFinite(value)) {
         return value;
@@ -563,20 +571,16 @@ export async function getActionVotingResults(actionId: string): Promise<ActionVo
       vote_timeline: parseTimeline(breakdown.vote_timeline),
     };
   } catch (error: unknown) {
-    if (isNotFoundError(error)) {
-      return {
-        drep_votes: { yes: '0', no: '0', abstain: '0' },
-        spo_votes: { yes: '0', no: '0', abstain: '0' },
-        cc_votes: { yes: '0', no: '0', abstain: '0' },
-        total_voting_power: '0',
-      };
-    }
-    console.error('Error fetching voting results:', error);
-    return {
+    const fallback: ActionVotingBreakdown = {
       drep_votes: { yes: '0', no: '0', abstain: '0' },
       spo_votes: { yes: '0', no: '0', abstain: '0' },
       cc_votes: { yes: '0', no: '0', abstain: '0' },
       total_voting_power: '0',
     };
+    if (isNotFoundError(error)) {
+      return fallback;
+    }
+    console.error('Error fetching voting results:', error);
+    return fallback;
   }
 }

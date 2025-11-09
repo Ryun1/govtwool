@@ -35,11 +35,9 @@ function formatTimestamp(timestamp: number): string {
   }
 }
 
-function TimelineTooltip({
-  active,
-  payload,
-  label,
-}: TooltipProps<number, string>) {
+function TimelineTooltip(props: TooltipProps<number, string>) {
+  const { active, payload } = props;
+
   if (!active || !payload || payload.length === 0) {
     return null;
   }
@@ -49,10 +47,13 @@ function TimelineTooltip({
     return null;
   }
 
+  const labelValue =
+    typeof props.label === 'number' ? props.label : item.timestamp;
+
   return (
     <div className="rounded-md border border-border bg-background/95 px-4 py-3 shadow-md backdrop-blur">
       <p className="text-sm font-semibold text-foreground">
-        {formatTimestamp(label as number)}
+        {formatTimestamp(labelValue)}
       </p>
       <div className="mt-2 space-y-1 text-sm">
         <p className="text-emerald-500 font-medium">Yes: {item.yes.toLocaleString()}</p>

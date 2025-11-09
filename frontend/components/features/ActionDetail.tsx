@@ -74,8 +74,28 @@ function formatPercent(value?: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-const sumCounts = (...values: Array<number | undefined>) =>
-  values.reduce((acc, value) => acc + (value ?? 0), 0);
+const sumCounts = (...values: Array<number | undefined>): number => {
+  let total = 0;
+  for (const value of values) {
+    total += value ?? 0;
+  }
+  return total;
+};
+
+type DetailEntry = {
+  label: string;
+  count: number;
+  power?: string;
+  percent?: number;
+};
+
+type DetailSection = {
+  key: string;
+  title: string;
+  votesCast: number;
+  entries: DetailEntry[];
+  extras: Array<{ label: string; value: string }>;
+};
 
 function getStatusVariant(status: string | undefined): 'success' | 'warning' | 'error' | 'info' | 'default' {
   switch (status) {
@@ -198,7 +218,7 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
       ).toString()
     : votingResults.spo_votes.abstain;
 
-  const detailSections = [
+  const detailSections: DetailSection[] = [
     {
       key: 'dreps',
       title: 'DReps',
