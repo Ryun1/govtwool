@@ -92,6 +92,9 @@
 - **Implementation (current state)**:
   - Enable via `CARDANO_VERIFIER_ENABLED=true` (optional `CARDANO_VERIFIER_ENDPOINT` override).
   - Backend submits available metadata JSON and records pass/fail/warning outcomes while treating network or rate-limit errors as warnings.
+  - Deployment env vars:
+    - `CARDANO_VERIFIER_ENABLED=true`
+    - `CARDANO_VERIFIER_ENDPOINT=https://verifycardanomessage.cardanofoundation.org/api/verify-cip100` (default; override for staging/mocks).
 
 - Respect rate limiting (20 requests/minute/IP). Implement exponential backoff or circuit breaking to avoid cascading failures.
 

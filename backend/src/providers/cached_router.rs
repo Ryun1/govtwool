@@ -304,10 +304,8 @@ impl CachedProviderRouter {
         // Check cache first
         if let Some(mut cached) = self.cache.get::<GovernanceAction>(&cache_key).await {
             debug!("Cache hit for action {}", id);
-            if cached.metadata_checks.is_none() {
-                cached = self.metadata_validator.attach_checks(cached).await;
-                self.cache.set(&cache_key, &cached).await;
-            }
+            cached = self.metadata_validator.attach_checks(cached).await;
+            self.cache.set(&cache_key, &cached).await;
             return Ok(Some(cached));
         }
 

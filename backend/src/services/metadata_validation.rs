@@ -60,9 +60,15 @@ impl MetadataValidator {
             return MetadataCheckResult::no_metadata(action.meta_is_valid);
         }
 
+        let verifier_enabled = self
+            .verifier
+            .as_ref()
+            .map(|config| config.enabled)
+            .unwrap_or(false);
         let cache_key = CacheKey::ActionMetadataValidation {
             action_id: action.action_id.clone(),
             meta_hash: action.meta_hash.clone(),
+            verifier_enabled,
         };
 
         if let Some(cached) = self.cache.get::<MetadataCheckResult>(&cache_key).await {
@@ -90,7 +96,7 @@ impl MetadataValidator {
             if let Some(bytes) = resolved.bytes_read {
                 result
                     .notes
-                    .push(format!("Fetched {} bytes for hash validation", bytes));
+                    .push(format!("Fetched {} bytes of metadata for hash validation", bytes));
             }
         }
 
@@ -109,10 +115,22 @@ impl MetadataValidator {
             .clone()
             .or_else(|| fetched_metadata.as_ref().and_then(|f| f.document.clone()));
 
+        let verifier_payload = metadata_document.as_ref().and_then(|value| {
+            if value.is_object() {
+                Some(value.clone())
+            } else if let Some(stringified) = value.as_str() {
+                serde_json::from_str::<serde_json::Value>(stringified)
+                    .ok()
+                    .filter(|parsed| parsed.is_object())
+            } else {
+                None
+            }
+        });
+
         if let Some(verifier) = &self.verifier {
             if verifier.enabled {
-                match metadata_document.as_ref() {
-                    Some(metadata_json) if metadata_json.is_object() => match self
+                match verifier_payload {
+                    Some(ref metadata_json) => match self
                         .verify_author_witness(&verifier.endpoint, metadata_json)
                         .await
                     {
@@ -125,11 +143,6 @@ impl MetadataValidator {
                             result.notes.push(error.user_note());
                         }
                     },
-                    Some(_) => {
-                        result.author_witness = CheckOutcome::unknown(
-                            "Metadata JSON not in object form; skipping author witness verification",
-                        );
-                    }
                     None => {
                         result.author_witness = CheckOutcome::unknown(
                             "Metadata JSON unavailable for author witness verification",
@@ -356,11 +369,19 @@ impl VerifierError {
 struct CfVerifierResponse {
     success: bool,
     #[serde(default)]
+    data: Option<CfVerifierData>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CfVerifierData {
+    #[serde(default)]
+    result: Option<bool>,
+    #[serde(default, rename = "errorMsg")]
+    error_msg: Option<String>,
+    #[serde(default)]
     authors: Vec<CfAuthorResult>,
-    #[serde(default)]
-    message: Option<String>,
-    #[serde(default)]
-    errors: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -398,15 +419,10 @@ impl MetadataValidator {
             .await
             .map_err(|_| VerifierError::InvalidResponse)?;
 
-        let mut notes =
-            vec!["Author witnesses verified via Cardano Foundation service".to_string()];
-
         if !payload.success {
-            notes.push("Cardano Foundation verifier reported failure.".to_string());
-            if let Some(message) = payload.message {
-                notes.push(Self::truncate_message(&message));
-            } else if let Some(first_error) = payload.errors.first() {
-                notes.push(Self::truncate_message(first_error));
+            let mut notes = vec!["Cardano Foundation verifier reported failure.".to_string()];
+            if let Some(error) = payload.error {
+                notes.push(Self::truncate_message(&error));
             }
             return Ok(AuthorVerifierOutcome {
                 outcome: CheckOutcome::fail(
@@ -416,7 +432,31 @@ impl MetadataValidator {
             });
         }
 
-        let total = payload.authors.len();
+        let Some(data) = payload.data else {
+            return Ok(AuthorVerifierOutcome {
+                outcome: CheckOutcome::warning(
+                    "Cardano Foundation verifier returned no data payload",
+                ),
+                notes: vec!["Verifier response missing data field.".to_string()],
+            });
+        };
+
+        let mut notes =
+            vec!["Author witnesses signatures valid".to_string()];
+
+        let reported_failure = matches!(data.result, Some(false));
+
+        if let Some(message) = data.error_msg.clone() {
+            notes.push(Self::truncate_message(&message));
+        }
+
+        if reported_failure {
+            notes.push(
+                "Cardano Foundation verifier reported witness verification failure.".to_string(),
+            );
+        }
+
+        let total = data.authors.len();
         if total == 0 {
             notes.push("No author witnesses returned by verifier.".to_string());
             return Ok(AuthorVerifierOutcome {
@@ -427,29 +467,29 @@ impl MetadataValidator {
             });
         }
 
-        let invalid_count = payload
-            .authors
-            .iter()
-            .filter(|author| !author.valid)
-            .count();
-        if invalid_count == 0 {
+        let (invalid_count, invalid_named): (usize, Vec<String>) =
+            data.authors
+                .into_iter()
+                .fold((0, Vec::new()), |(mut count, mut names), author| {
+                    if !author.valid {
+                        count += 1;
+                        if let Some(name) = author.name {
+                            names.push(name);
+                        }
+                    }
+                    (count, names)
+                });
+
+        if invalid_count == 0 && !reported_failure {
             return Ok(AuthorVerifierOutcome {
-                outcome: CheckOutcome::pass("Author witnesses verified via Cardano Foundation"),
+                outcome: CheckOutcome::pass("Author witnesses verified via CF's CIP-100 verifier"),
                 notes,
             });
         }
 
         notes.push(format!(
-            "{} of {} author witnesses failed verification",
-            invalid_count, total
+            "{invalid_count} of {total} author witnesses failed verification"
         ));
-
-        let invalid_named: Vec<String> = payload
-            .authors
-            .into_iter()
-            .filter(|author| !author.valid)
-            .filter_map(|author| author.name)
-            .collect();
 
         if !invalid_named.is_empty() {
             notes.push(format!(

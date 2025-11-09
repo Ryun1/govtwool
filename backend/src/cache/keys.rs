@@ -35,6 +35,7 @@ pub enum CacheKey {
         action_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         meta_hash: Option<String>,
+        verifier_enabled: bool,
     },
     StakeDelegation {
         stake_address: String,
@@ -68,9 +69,17 @@ impl CacheKey {
             CacheKey::ActionMetadataValidation {
                 action_id,
                 meta_hash,
+                verifier_enabled,
             } => match meta_hash {
-                Some(hash) => format!("action_metadata:{action_id}:hash={}", hash.to_lowercase()),
-                None => format!("action_metadata:{action_id}:nohash"),
+                Some(hash) => format!(
+                    "action_metadata:{action_id}:hash={}:verifier={}",
+                    hash.to_lowercase(),
+                    verifier_enabled
+                ),
+                None => format!(
+                    "action_metadata:{action_id}:nohash:verifier={}",
+                    verifier_enabled
+                ),
             },
             CacheKey::StakeDelegation { stake_address } => {
                 format!("stake_delegation:{}", stake_address)

@@ -46,7 +46,7 @@ const summaryOrder: Array<{
   {
     key: 'author_witness',
     title: 'Author Witness',
-    description: 'Validates author signatures (coming soon).',
+    description: 'Validates the correctness of author signatures.',
   },
 ];
 
@@ -59,6 +59,9 @@ export function MetadataValidationSummary({ checks, metaUrl }: MetadataValidatio
   if (!checks) {
     return null;
   }
+
+  const authorStatus = checks.author_witness?.status ?? 'unknown';
+  const showVerifierFootnote = ['pass', 'fail', 'warning'].includes(authorStatus);
 
   return (
     <Card className="border-dashed border-field-green/40">

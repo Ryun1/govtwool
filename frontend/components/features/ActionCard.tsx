@@ -220,26 +220,26 @@ function ActionCard({ action }: ActionCardProps) {
               {getStatusIcon(status)}
               <span>{status}</span>
             </Badge>
-            {metadataBadge
-              ? (() => {
-                  const Icon = metadataBadge.icon;
-                  return (
-                    <Badge
-                      variant={metadataBadge.variant}
-                      className="flex items-center gap-1 text-xs"
-                      title={metadataBadge.message}
-                    >
-                      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
-                      <span>{metadataBadge.label}</span>
-                    </Badge>
-                  );
-                })()
-              : hasMetadata && (
-                  <Badge variant="outline" className="text-xs flex items-center gap-1">
-                    <span aria-hidden="true">🐑</span>
-                    <span>Has metadata</span>
-                  </Badge>
-                )}
+             {metadataBadge
+               ? (() => {
+                   const Icon = metadataBadge.icon;
+                   return (
+                     <Badge
+                       variant={metadataBadge.variant}
+                       className="flex items-center gap-1 text-xs"
+                       title={metadataBadge.message}
+                     >
+                       <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                       <span>{metadataBadge.label}</span>
+                     </Badge>
+                   );
+                 })()
+               : hasMetadata && (
+                   <Badge variant="outline" className="text-xs flex items-center gap-1">
+                     <span aria-hidden="true">🐑</span>
+                     <span>Has metadata</span>
+                   </Badge>
+                 )}
           </div>
         </div>
       </CardHeader>
