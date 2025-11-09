@@ -55,6 +55,43 @@
 - Hosted verifier: the Cardano Foundation exposes `GET/POST /api/verify-cip100` for server-side verification of the entire metadata package, including witnesses ([API docs](https://verifycardanomessage.cardanofoundation.org/api-docs)). Use as an optional fallback when local cryptography is unavailable or as a secondary opinion. Record latency and response codes when calling the endpoint.
 - Privacy consideration: only send publicly hosted metadata to the external service, and communicate to users when a remote verifier is consulted.
 
+#### Author Witness Data Model (CIP-0100 Highlights)
+
+- `authors[]` entries can embed the witness either directly or within a `proofs` array. Common fields:
+  - `name` / `handle` – human-readable identifier.
+  - `witness.type` – expected values include `cip8` (Ed25519 signature) and `cip30` (wallet bridge signature).
+  - `witness.payload` – canonical JSON string the author signed (often includes the proposal hash, timestamp, role).
+  - `witness.signature` – hex-encoded signature (64 bytes for Ed25519).
+  - `witness.publicKey` or `stakeAddress` – verification key reference.
+- For multi-signature authorship, CIP-0100 allows `witnesses` array per author; all entries must validate for the author to be considered verified.
+
+#### Hosted Verification API Usage Plan
+
+- **Endpoint**: `POST https://verifycardanomessage.cardanofoundation.org/api/verify-cip100`
+  ```json
+  {
+    "metadata": { /* full CIP-100 JSON */ }
+  }
+  ```
+- **Success Response** (abridged):
+  ```json
+  {
+    "success": true,
+    "hash": { "valid": true },
+    "authors": [
+      { "name": "Example Author", "valid": true, "witness": { "type": "cip8" } }
+    ],
+    "schema": { "valid": true }
+  }
+  ```
+- **Failure Response** includes granular error codes (`hashMismatch`, `invalidSignature`, `schemaError`). Treat non-2xx responses or `success: false` as validation failures and log the payload for observability (excluding sensitive fields).
+- **Integration Strategy**:
+  1. Feature-flag outbound calls to avoid mandatory reliance.
+  2. Deduplicate calls by caching on `(meta_hash, resolved_url)`.
+  3. Surface remote verdict in backend `metadata_checks.author_witness` (pass/fail) and append a note stating “Verified via Cardano Foundation service”.
+
+- Respect rate limiting (20 requests/minute/IP). Implement exponential backoff or circuit breaking to avoid cascading failures.
+
 ### 5. Operational Safeguards
 
 - Enforce maximum metadata size (CIP-0100 suggests 16 KB, external verifier caps at 5 MB).

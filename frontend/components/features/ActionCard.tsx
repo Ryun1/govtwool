@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { memo, useCallback, type KeyboardEvent } from 'react';
+import { memo, useCallback, type KeyboardEvent, type ElementType } from 'react';
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import {
@@ -215,7 +215,7 @@ function formatTreasuryAmount(amount: string): string {
 type MetadataBadge = {
   label: string;
   variant: 'success' | 'error' | 'info' | 'outline';
-  icon: React.ElementType;
+  icon: ElementType;
   message?: string;
 };
 

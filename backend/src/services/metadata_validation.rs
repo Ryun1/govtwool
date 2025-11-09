@@ -67,6 +67,7 @@ impl MetadataValidator {
 
     async fn compute_validation(&self, action: &GovernanceAction) -> MetadataCheckResult {
         let mut result = MetadataCheckResult::default_with_koios(action.meta_is_valid);
+        // TODO: Integrate author witness verification (CIP-100) once cryptographic helpers or hosted service integration is available.
 
         let ipfs_outcome = self.evaluate_ipfs(action.meta_url.as_deref());
         result.ipfs = ipfs_outcome.clone();

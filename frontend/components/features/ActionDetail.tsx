@@ -259,6 +259,111 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
       ).toString()
     : votingResults.spo_votes.abstain;
 
+  const detailSections = [
+    {
+      key: 'dreps',
+      title: 'DReps',
+      votesCast: drepVotesCast,
+      entries: [
+        {
+          label: 'Yes',
+          count: drepYesCount,
+          power: drepYesPower,
+          percent: summary?.drep_yes_pct,
+        },
+        {
+          label: 'No',
+          count: drepNoCount,
+          power: drepNoPower,
+          percent: summary?.drep_no_pct,
+        },
+        {
+          label: 'Abstain',
+          count: drepAbstainCount,
+          power: drepAbstainPower,
+        },
+      ],
+      extras: summary
+        ? [
+            {
+              label: 'Always Abstain Power',
+              value: formatAdaValue(summary?.drep_always_abstain_vote_power),
+            },
+            {
+              label: 'Always No-Confidence Power',
+              value: formatAdaValue(summary?.drep_always_no_confidence_vote_power),
+            },
+          ]
+        : [],
+    },
+    {
+      key: 'spos',
+      title: 'Stake Pools',
+      votesCast: spoVotesCast,
+      entries: [
+        {
+          label: 'Yes',
+          count: spoYesCount,
+          power: spoYesPower,
+          percent: summary?.pool_yes_pct,
+        },
+        {
+          label: 'No',
+          count: spoNoCount,
+          power: spoNoPower,
+          percent: summary?.pool_no_pct,
+        },
+        {
+          label: 'Abstain',
+          count: spoAbstainCount,
+          power: spoAbstainPower,
+        },
+      ],
+      extras: summary
+        ? [
+            {
+              label: 'Passive Always-Abstain Votes',
+              value: formatVoteCount(summary?.pool_passive_always_abstain_votes_assigned),
+            },
+            {
+              label: 'Passive Always-Abstain Power',
+              value: formatAdaValue(summary?.pool_passive_always_abstain_vote_power),
+            },
+            {
+              label: 'Passive Always No-Confidence Votes',
+              value: formatVoteCount(summary?.pool_passive_always_no_confidence_votes_assigned),
+            },
+            {
+              label: 'Passive Always No-Confidence Power',
+              value: formatAdaValue(summary?.pool_passive_always_no_confidence_vote_power),
+            },
+          ]
+        : [],
+    },
+    {
+      key: 'cc',
+      title: 'Constitutional Committee',
+      votesCast: ccVotesCast,
+      entries: [
+        {
+          label: 'Yes',
+          count: ccYesCount,
+          percent: summary?.committee_yes_pct,
+        },
+        {
+          label: 'No',
+          count: ccNoCount,
+          percent: summary?.committee_no_pct,
+        },
+        {
+          label: 'Abstain',
+          count: ccAbstainCount,
+        },
+      ],
+      extras: [] as Array<{ label: string; value: string }>,
+    },
+  ];
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -499,7 +604,7 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
               <CardTitle>Voting Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Total Voting Power</p>
                   <p className="text-2xl font-bold">{formatVotingPower(votingResults.total_voting_power)}</p>
@@ -509,7 +614,9 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">Yes</span>
-                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">{formatVotingPower(totalYes.toString())}</span>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        {formatVotingPower(totalYes.toString())}
+                      </span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
@@ -519,7 +626,11 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                         }}
                         aria-label={`Yes votes: ${formatVotingPower(totalYes.toString())}`}
                         role="progressbar"
-                        aria-valuenow={votingResults.total_voting_power !== '0' ? (Number(totalYes) / Number(votingResults.total_voting_power)) * 100 : 0}
+                        aria-valuenow={
+                          votingResults.total_voting_power !== '0'
+                            ? (Number(totalYes) / Number(votingResults.total_voting_power)) * 100
+                            : 0
+                        }
                         aria-valuemin={0}
                         aria-valuemax={100}
                       />
@@ -529,7 +640,9 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">No</span>
-                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">{formatVotingPower(totalNo.toString())}</span>
+                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        {formatVotingPower(totalNo.toString())}
+                      </span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
@@ -539,7 +652,11 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                         }}
                         aria-label={`No votes: ${formatVotingPower(totalNo.toString())}`}
                         role="progressbar"
-                        aria-valuenow={votingResults.total_voting_power !== '0' ? (Number(totalNo) / Number(votingResults.total_voting_power)) * 100 : 0}
+                        aria-valuenow={
+                          votingResults.total_voting_power !== '0'
+                            ? (Number(totalNo) / Number(votingResults.total_voting_power)) * 100
+                            : 0
+                        }
                         aria-valuemin={0}
                         aria-valuemax={100}
                       />
@@ -549,7 +666,9 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">Abstain</span>
-                      <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">{formatVotingPower(totalAbstain.toString())}</span>
+                      <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                        {formatVotingPower(totalAbstain.toString())}
+                      </span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
@@ -559,13 +678,107 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                         }}
                         aria-label={`Abstain votes: ${formatVotingPower(totalAbstain.toString())}`}
                         role="progressbar"
-                        aria-valuenow={votingResults.total_voting_power !== '0' ? (Number(totalAbstain) / Number(votingResults.total_voting_power)) * 100 : 0}
+                        aria-valuenow={
+                          votingResults.total_voting_power !== '0'
+                            ? (Number(totalAbstain) / Number(votingResults.total_voting_power)) * 100
+                            : 0
+                        }
                         aria-valuemin={0}
                         aria-valuemax={100}
                       />
                     </div>
                   </div>
                 </div>
+
+                {(totalVotesCast > 0 || summary) && (
+                  <div className="space-y-6 pt-4 border-t border-border">
+                    {totalVotesCast > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Total Ballots Cast</span>
+                          <span className="text-sm font-semibold">{formatVoteLabel(totalVotesCast)}</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div className="rounded-md bg-muted/40 p-3">
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">Yes</p>
+                            <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                              {formatVoteCount(yesVotesCountTotal)}
+                            </p>
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-3">
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">No</p>
+                            <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                              {formatVoteCount(noVotesCountTotal)}
+                            </p>
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-3">
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">Abstain</p>
+                            <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                              {formatVoteCount(abstainVotesCountTotal)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {summary && (
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          Detailed Breakdown by Voter Type
+                        </h4>
+                        <div className="space-y-4">
+                          {detailSections.map((section) => (
+                            <div
+                              key={section.key}
+                              className="space-y-4 rounded-lg border border-border/60 bg-muted/30 p-4"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-foreground">{section.title}</span>
+                                {section.votesCast > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatVoteLabel(section.votesCast)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                {section.entries.map((entry) => (
+                                  <div key={entry.label} className="space-y-1">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                      {entry.label}
+                                    </p>
+                                    <p className="text-base font-semibold text-foreground">
+                                      {formatVoteCount(entry.count)}
+                                    </p>
+                                    {entry.percent !== undefined && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatPercent(entry.percent)}
+                                      </p>
+                                    )}
+                                    {entry.power && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatAdaValue(entry.power)}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {section.extras.length > 0 && (
+                                <div className="grid gap-2 border-t border-border/60 pt-3 text-xs sm:text-sm">
+                                  {section.extras.map((extra) => (
+                                    <div key={extra.label} className="flex items-center justify-between gap-3">
+                                      <span className="text-muted-foreground">{extra.label}</span>
+                                      <span className="font-medium text-foreground">{extra.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -197,7 +197,7 @@ impl MetadataCheckResult {
             hash: CheckOutcome::unknown("Hash validation pending"),
             ipfs: CheckOutcome::unknown("Hosting validation pending"),
             author_witness: CheckOutcome::pending(
-                "Author witness verification not yet implemented in backend",
+                "Author witness verification not yet implemented in backend (CIP-100)",
             ),
             resolved_url: None,
             koios_meta_is_valid: meta_is_valid,

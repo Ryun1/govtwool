@@ -1,5 +1,6 @@
 'use client';
 
+import type { ElementType } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import type { MetadataCheckResult, MetadataCheckOutcome } from '@/types/governance';
@@ -18,7 +19,7 @@ type ValidationKey = 'hash' | 'ipfs' | 'author_witness';
 
 const statusConfig: Record<
   MetadataCheckOutcome['status'],
-  { label: string; icon: React.ElementType; variant: BadgeVariant }
+  { label: string; icon: ElementType; variant: BadgeVariant }
 > = {
   pass: { label: 'Pass', icon: CheckCircle, variant: 'success' },
   fail: { label: 'Fail', icon: XCircle, variant: 'error' },
