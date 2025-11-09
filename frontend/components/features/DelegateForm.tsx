@@ -20,7 +20,7 @@ interface DelegateFormProps {
 
 export default function DelegateForm({ dreps, hasMore, onLoadMore, loading, onSearch }: DelegateFormProps) {
   const { connectedWallet } = useWalletContext();
-  const { state, reset, setBuilding, setTxHash, setError } = useTransaction();
+  const { state, reset, setBuilding, setSigning, setSubmitting, setTxHash, setError } = useTransaction();
   const [selectedDRep, setSelectedDRep] = useState<DRep | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -54,16 +54,34 @@ export default function DelegateForm({ dreps, hasMore, onLoadMore, loading, onSe
     if (!connectedWallet || !selectedDRep) return;
 
     reset();
-    setShowModal(true);
-    setBuilding(true);
 
     try {
-      const txHash = await submitDelegationTransaction(connectedWallet, selectedDRep.drep_id);
-      setBuilding(false);
+      const txHash = await submitDelegationTransaction(
+        connectedWallet,
+        selectedDRep.drep_id,
+        (stage) => {
+          switch (stage) {
+            case 'building':
+              setBuilding(true);
+              break;
+            case 'signing':
+              setBuilding(false);
+              setSigning(true);
+              break;
+            case 'submitting':
+              setSigning(false);
+              setSubmitting(true);
+              break;
+          }
+        }
+      );
+      setSubmitting(false);
       setTxHash(txHash);
     } catch (error: unknown) {
       setBuilding(false);
-      setError(error instanceof Error ? error.message : 'Failed to submit transaction');
+      setSigning(false);
+      setSubmitting(false);
+      setError(error instanceof Error ? error.message : 'Failed to submit delegation transaction');
     }
   };
 
