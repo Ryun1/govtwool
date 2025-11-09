@@ -60,7 +60,9 @@ impl CacheKey {
             }
             CacheKey::Action { id } => format!("action:{}", id),
             CacheKey::ActionVotes { id } => format!("action_votes:{}", id),
-            CacheKey::StakeDelegation { stake_address } => format!("stake_delegation:{}", stake_address),
+            CacheKey::StakeDelegation { stake_address } => {
+                format!("stake_delegation:{}", stake_address)
+            }
         }
     }
 

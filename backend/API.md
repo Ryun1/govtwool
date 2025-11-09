@@ -157,13 +157,26 @@ Get statistics about DReps.
 
 ```json
 {
-  "active_dreps_count": 2831
+  "active_dreps_count": 2831,
+  "total_dreps_count": 861,
+  "total_voting_power": "93486432615839",
+  "top_drep": {
+    "drep_id": "drep1qz8frp3eq58v3dcguhv0753yt9gf3g50plrxw8rxu2f2krf2p5d",
+    "name": "Army of Spies",
+    "voting_power": "93486432615839"
+  }
 }
 ```
 
 **Response Fields:**
 
 - `active_dreps_count`: Number of active DReps (may be `null` if unavailable)
+- `total_dreps_count`: Total number of registered DReps (may be `null` if unavailable)
+- `total_voting_power`: Sum of voting power across all DReps, in lovelace (may be `null`)
+- `top_drep`: Object describing the DRep with the highest voting power (may be omitted if unavailable)
+  - `drep_id`: Identifier for the leading DRep
+  - `name`: Friendly name if available
+  - `voting_power`: Voting power for the DRep, in lovelace
 
 ---
 

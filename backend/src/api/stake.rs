@@ -1,6 +1,10 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
 use crate::models::StakeDelegation; // restored import (even if unused originally before cleanup)
 use crate::providers::CachedProviderRouter;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]

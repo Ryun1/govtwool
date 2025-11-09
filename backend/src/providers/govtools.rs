@@ -166,7 +166,10 @@ fn build_metadata(enrichment: &GovToolsEnrichment) -> Option<DRepMetadata> {
     }
 
     if let Some(qualifications) = trimmed(&enrichment.qualifications) {
-        metadata.insert("qualifications".to_string(), JsonValue::String(qualifications));
+        metadata.insert(
+            "qualifications".to_string(),
+            JsonValue::String(qualifications),
+        );
     }
 
     if let Some(image_url) = trimmed(&enrichment.image_url) {
@@ -174,7 +177,10 @@ fn build_metadata(enrichment: &GovToolsEnrichment) -> Option<DRepMetadata> {
     }
 
     if let Some(payment_address) = trimmed(&enrichment.payment_address) {
-        metadata.insert("paymentAddress".to_string(), JsonValue::String(payment_address));
+        metadata.insert(
+            "paymentAddress".to_string(),
+            JsonValue::String(payment_address),
+        );
     }
 
     if metadata.is_empty() {

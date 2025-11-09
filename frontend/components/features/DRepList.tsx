@@ -6,6 +6,7 @@ import { DRepCardSkeleton } from '../ui/CardSkeleton';
 import { Button } from '../ui/Button';
 import type { DRep } from '@/types/governance';
 import { cn } from '@/lib/utils';
+import { useId } from 'react';
 
 type StatusFilter = 'All' | 'Active' | 'Inactive' | 'Retired' | 'Script';
 type SortFilter = 'Activity' | 'VotingPower' | 'Name' | 'Registration';
@@ -90,6 +91,10 @@ export default function DRepList({
   totalCount,
   itemsPerPage = 20,
 }: DRepListProps) {
+  const searchInputId = useId();
+  const statusSelectId = useId();
+  const sortSelectId = useId();
+  const directionSelectId = useId();
   const totalPages =
     typeof totalCount === 'number' && itemsPerPage
       ? Math.max(1, Math.ceil(totalCount / itemsPerPage))
@@ -98,7 +103,10 @@ export default function DRepList({
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1 relative">
+        <div className="relative flex-1">
+          <label htmlFor={searchInputId} className="sr-only">
+            Search DReps
+          </label>
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
@@ -110,10 +118,15 @@ export default function DRepList({
               'text-foreground placeholder:text-muted-foreground',
               'focus:border-transparent focus:ring-2 focus:ring-ring'
             )}
+            id={searchInputId}
+            autoComplete="off"
           />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <label htmlFor={statusSelectId} className="sr-only">
+            Filter by status
+          </label>
           <select
             value={statusFilter}
             onChange={(event) => {
@@ -123,9 +136,11 @@ export default function DRepList({
               }
             }}
             className={cn(
-              'rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground',
+              'min-w-[160px] rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground',
               'focus:border-transparent focus:ring-2 focus:ring-ring'
             )}
+            id={statusSelectId}
+            aria-label="Filter DReps by status"
           >
             {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -134,6 +149,9 @@ export default function DRepList({
             ))}
           </select>
 
+          <label htmlFor={sortSelectId} className="sr-only">
+            Sort DReps
+          </label>
           <select
             value={sortBy}
             onChange={(event) => {
@@ -143,9 +161,11 @@ export default function DRepList({
               }
             }}
             className={cn(
-              'rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground',
+              'min-w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground',
               'focus:border-transparent focus:ring-2 focus:ring-ring'
             )}
+            id={sortSelectId}
+            aria-label="Sort DReps"
           >
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -154,6 +174,9 @@ export default function DRepList({
             ))}
           </select>
 
+          <label htmlFor={directionSelectId} className="sr-only">
+            Sort direction
+          </label>
           <select
             value={sortDirection}
             onChange={(event) => {
@@ -163,9 +186,11 @@ export default function DRepList({
               }
             }}
             className={cn(
-              'rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground',
+              'min-w-[150px] rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground',
               'focus:border-transparent focus:ring-2 focus:ring-ring'
             )}
+            id={directionSelectId}
+            aria-label="Sort direction"
           >
             {directionOptions.map((option) => (
               <option key={option.value} value={option.value}>

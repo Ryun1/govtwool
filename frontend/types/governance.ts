@@ -81,6 +81,19 @@ export interface DRepExternalReference {
   uri?: string;
 }
 
+export interface DRepLeaderSummary {
+  drep_id: string;
+  name?: string;
+  voting_power?: string;
+}
+
+export interface DRepStatsSummary {
+  active_dreps_count?: number | null;
+  total_dreps_count?: number | null;
+  total_voting_power?: string | null;
+  top_drep?: DRepLeaderSummary | null;
+}
+
 export interface GovernanceActionMetadata extends JsonObject {
   title?: JsonValue;
   description?: JsonValue;

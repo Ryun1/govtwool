@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import DRepList from '@/components/features/DRepList';
 import { DRepsSummaryStats } from '@/components/features/DRepsSummaryStats';
-import type { DRep, DRepMetadata } from '@/types/governance';
+import type { DRep, DRepMetadata, DRepStatsSummary } from '@/types/governance';
 import {
   sanitizeMetadataValue,
   getMetadataName,
@@ -112,19 +112,37 @@ const fetchDRepsPage = async (
   return { dreps, hasMore, total };
 };
 
-const fetchActiveDRepsCount = async (): Promise<number | null> => {
+const fetchDRepStats = async (): Promise<DRepStatsSummary | null> => {
   try {
     const response = await fetch('/api/dreps/stats');
     if (!response.ok) {
       return null;
     }
     const payload: unknown = await response.json();
-    if (isRecord(payload) && typeof payload.active_dreps_count === 'number') {
-      return payload.active_dreps_count;
+    if (!isRecord(payload)) {
+      return null;
     }
-    return null;
+    return {
+      active_dreps_count:
+        typeof payload.active_dreps_count === 'number' ? payload.active_dreps_count : null,
+      total_dreps_count:
+        typeof payload.total_dreps_count === 'number' ? payload.total_dreps_count : null,
+      total_voting_power:
+        typeof payload.total_voting_power === 'string' ? payload.total_voting_power : null,
+      top_drep:
+        isRecord(payload.top_drep) && typeof payload.top_drep.drep_id === 'string'
+          ? {
+              drep_id: payload.top_drep.drep_id,
+              name: typeof payload.top_drep.name === 'string' ? payload.top_drep.name : undefined,
+              voting_power:
+                typeof payload.top_drep.voting_power === 'string'
+                  ? payload.top_drep.voting_power
+                  : undefined,
+            }
+          : null,
+    };
   } catch (error) {
-    console.error('Error fetching active DRep count:', error);
+    console.error('Error fetching DRep stats:', error);
     return null;
   }
 };
@@ -135,7 +153,7 @@ export default function DRepsPage() {
   const [allDReps, setAllDReps] = useState<DRep[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingAllDReps, setLoadingAllDReps] = useState(false);
-  const [activeDRepsCount, setActiveDRepsCount] = useState<number | null>(null);
+  const [summaryStats, setSummaryStats] = useState<DRepStatsSummary | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState<number | null>(null);
@@ -298,13 +316,13 @@ export default function DRepsPage() {
               pageSize: 100,
             };
 
-            Promise.all([fetchDRepsPage(statsQuery), fetchActiveDRepsCount()])
-              .then(([sample, activeCount]) => {
+            Promise.all([fetchDRepsPage(statsQuery), fetchDRepStats()])
+              .then(([sample, statsSummary]) => {
                 if (!isCancelled) {
                   rememberMetadataFrom(sample.dreps);
                   const appliedSample = applyMetadataFromCache(sample.dreps);
                   setAllDReps(appliedSample);
-                  setActiveDRepsCount(activeCount);
+                  setSummaryStats(statsSummary);
 
                   const sampleMissing = identifyDRepsNeedingMetadata(appliedSample);
                   fetchMetadataForDReps(sampleMissing)
@@ -383,7 +401,10 @@ export default function DRepsPage() {
       {loadingAllDReps && allDReps.length === 0 ? (
         <div className="mb-8 text-center text-muted-foreground">Loading statistics...</div>
       ) : (
-        <DRepsSummaryStats dreps={allDReps.length > 0 ? allDReps : dreps} activeDRepsCount={activeDRepsCount} />
+        <DRepsSummaryStats
+          dreps={allDReps.length > 0 ? allDReps : dreps}
+          summaryStats={summaryStats ?? undefined}
+        />
       )}
 
       <DRepList

@@ -116,17 +116,15 @@ pub async fn get_drep_metadata(
 pub async fn get_drep_stats(
     State(router): State<CachedProviderRouter>,
 ) -> Result<Json<DRepStats>, StatusCode> {
-    match router.get_total_active_dreps().await {
-        Ok(Some(count)) => Ok(Json(DRepStats {
-            active_dreps_count: Some(count),
-        })),
-        Ok(None) => Ok(Json(DRepStats {
-            active_dreps_count: None,
-        })),
+    match router.get_drep_stats().await {
+        Ok(stats) => Ok(Json(stats)),
         Err(e) => {
             tracing::error!("Error fetching DRep stats: {}", e);
             Ok(Json(DRepStats {
                 active_dreps_count: None,
+                total_dreps_count: None,
+                total_voting_power: None,
+                top_drep: None,
             }))
         }
     }

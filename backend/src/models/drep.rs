@@ -144,6 +144,22 @@ pub struct DRepsPage {
 #[serde(rename_all = "snake_case")]
 pub struct DRepStats {
     pub active_dreps_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_dreps_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_voting_power: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_drep: Option<DRepLeader>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DRepLeader {
+    pub drep_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voting_power: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
