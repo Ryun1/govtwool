@@ -26,11 +26,7 @@ export async function GET(
     }
 
     // Query backend API for delegation info
-        // Align with other API routes: prefer NEXT_PUBLIC_BACKEND_URL, then BACKEND_URL, then localhost
-    const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      process.env.BACKEND_URL ||
-      'http://localhost:8080';
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://govtwool-backend.onrender.com';
     const response = await fetch(`${backendUrl}/api/stake/${stakeAddress}/delegation`, {
       headers: {
         'Accept': 'application/json',
