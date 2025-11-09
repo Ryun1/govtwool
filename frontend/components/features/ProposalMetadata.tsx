@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ExternalLink, AlertCircle } from 'lucide-react';
 import type { GovernanceAction } from '@/types/governance';
 import { Markdown } from '../ui/Markdown';
 
@@ -270,23 +270,9 @@ function resolveReferenceUri(uri?: string): string | undefined {
   return uri;
 }
 
-/**
- * Validate metadata hash if meta_hash is provided
- */
-function validateMetadataHash(_metadata: unknown, metaHash?: string): boolean | null {
-  if (!metaHash) {
-    return null; // No hash provided, can't validate
-  }
-
-  // TODO: Implement actual hash validation
-  // For now, if meta_hash exists, we assume it's valid
-  return true;
-}
-
 export function ProposalMetadata({ action }: ProposalMetadataProps) {
   const metadata = getMetadata(action);
   const hasMetadata = Boolean(metadata.title || metadata.description || metadata.rationale);
-  const validationStatus = validateMetadataHash(metadata, action.meta_hash);
   const sections: Array<{ label: string; content: string }> = [];
 
   function addSection(label: string, value?: string) {
@@ -329,15 +315,6 @@ export function ProposalMetadata({ action }: ProposalMetadataProps) {
               <Badge variant="secondary" className="text-xs">
                 {action.meta_language.toUpperCase()}
               </Badge>
-            )}
-            {validationStatus !== null && (
-              <div className="flex items-center gap-1">
-                {validationStatus ? (
-                  <CheckCircle className="w-4 h-4 text-green-500" aria-label="Metadata hash validated" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-500" aria-label="Metadata hash validation failed" />
-                )}
-              </div>
             )}
             {action.meta_is_valid === false && (
               <AlertCircle className="w-4 h-4 text-yellow-500" aria-label="Metadata marked as invalid" />

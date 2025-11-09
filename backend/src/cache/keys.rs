@@ -31,6 +31,12 @@ pub enum CacheKey {
     ActionVotes {
         id: String,
     },
+    ActionMetadataValidation {
+        action_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        meta_hash: Option<String>,
+        verifier_enabled: bool,
+    },
     StakeDelegation {
         stake_address: String,
     },
@@ -60,6 +66,21 @@ impl CacheKey {
             }
             CacheKey::Action { id } => format!("action:{}", id),
             CacheKey::ActionVotes { id } => format!("action_votes:{}", id),
+            CacheKey::ActionMetadataValidation {
+                action_id,
+                meta_hash,
+                verifier_enabled,
+            } => match meta_hash {
+                Some(hash) => format!(
+                    "action_metadata:{action_id}:hash={}:verifier={}",
+                    hash.to_lowercase(),
+                    verifier_enabled
+                ),
+                None => format!(
+                    "action_metadata:{action_id}:nohash:verifier={}",
+                    verifier_enabled
+                ),
+            },
             CacheKey::StakeDelegation { stake_address } => {
                 format!("stake_delegation:{}", stake_address)
             }
@@ -86,6 +107,8 @@ impl CacheKey {
             CacheKey::DRepVotingHistory { .. } => 300,
             // DRep metadata: 600 seconds
             CacheKey::DRepMetadata { .. } => 600,
+            // Metadata validation: 600 seconds
+            CacheKey::ActionMetadataValidation { .. } => 600,
             // Action votes: 180 seconds
             CacheKey::ActionVotes { .. } => 180,
             // Stake delegation: 60 seconds

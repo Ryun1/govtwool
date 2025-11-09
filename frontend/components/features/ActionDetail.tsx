@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { VotingChart } from '../charts/VotingChart';
+import { VotingTimelineChart } from '../charts/VotingTimelineChart';
 import { VotingProgress } from '../charts/VotingProgress';
 import { ProposalMetadata } from './ProposalMetadata';
+import { MetadataValidationSummary } from './MetadataValidationSummary';
 import { ProposalTimeline } from './ProposalTimeline';
 import { Clock, Calendar, Hash, ExternalLink, DollarSign, Settings } from 'lucide-react';
 import type { GovernanceAction, ActionVotingBreakdown } from '@/types/governance';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
+import { getActionDisplayType, getActionTitle } from '@/lib/governance';
 
 interface ActionDetailProps {
   action: GovernanceAction;
@@ -19,6 +20,9 @@ interface ActionDetailProps {
 }
 
 function formatActionType(type: string): string {
+  if (type === 'budget') {
+    return 'Budget Action💰';
+  }
   return type
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -37,6 +41,62 @@ function formatVotingPower(power: string): string {
   return `${ada.toFixed(2)} ADA`;
 }
 
+function formatAdaValue(value?: string): string {
+  if (!value) {
+    return '—';
+  }
+  try {
+    return formatVotingPower(value);
+  } catch {
+    return '—';
+  }
+}
+
+function formatVoteCount(count?: number): string {
+  if (typeof count !== 'number') {
+    return '—';
+  }
+  return count.toLocaleString();
+}
+
+function formatVoteLabel(count?: number): string {
+  if (typeof count !== 'number') {
+    return '—';
+  }
+  const formatted = count.toLocaleString();
+  return `${formatted} ${count === 1 ? 'vote' : 'votes'}`;
+}
+
+function formatPercent(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '—';
+  }
+  return `${value.toFixed(1)}%`;
+}
+
+const sumCounts = (...values: Array<number | undefined>): number => {
+  let total = 0;
+  for (const value of values) {
+    total += value ?? 0;
+  }
+  return total;
+};
+
+type DetailEntry = {
+  label: string;
+  count: number;
+  power?: string;
+  percent?: number;
+};
+
+type DetailSection = {
+  key: string;
+  title: string;
+  votesCast: number;
+  entries: DetailEntry[];
+  extras: Array<{ label: string; value: string }>;
+};
+
 function getStatusVariant(status: string | undefined): 'success' | 'warning' | 'error' | 'info' | 'default' {
   switch (status) {
     case 'enacted':
@@ -50,71 +110,6 @@ function getStatusVariant(status: string | undefined): 'success' | 'warning' | '
     default:
       return 'default';
   }
-}
-
-/**
- * Extract string from value (handles both string and object formats)
- */
-function extractString(value: unknown): string | undefined {
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (isRecord(value)) {
-    const candidates: Array<unknown> = [value.content, value.text, value.value, value.description, value.label];
-    for (const candidate of candidates) {
-      if (typeof candidate === 'string') {
-        return candidate;
-      }
-    }
-  }
-  return undefined;
-}
-
-/**
- * Get metadata title from action (ensures it's always a string)
- * Handles CIP-100/CIP-108 format
- */
-function getMetadataTitle(action: GovernanceAction): string {
-  // Try meta_json first (handle CIP-100/CIP-108 format)
-  if (action.meta_json) {
-    try {
-      const parsed: unknown =
-        typeof action.meta_json === 'string'
-          ? JSON.parse(action.meta_json)
-          : action.meta_json;
-
-      if (isRecord(parsed)) {
-        const body = isRecord(parsed.body) ? parsed.body : undefined;
-        if (body) {
-          const title = extractString(body.title);
-          if (title) return title;
-          const abstract = extractString(body.abstract);
-          if (abstract) return abstract;
-        }
-
-        const title = extractString(parsed.title);
-        if (title) return title;
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }
-  
-  // Try metadata field (already normalized from CIP-100/CIP-108 if applicable)
-  if (action.metadata) {
-    const title = extractString(action.metadata.title);
-    if (title) return title;
-    // Fallback to abstract if title not available
-    const abstract = extractString(action.metadata.abstract);
-    if (abstract) return abstract;
-  }
-  
-  // Fallback to description (ensure it's a string)
-  const description = extractString(action.description);
-  if (description) return description;
-  
-  // Final fallback to action ID
-  return `Action ${action.action_id}`;
 }
 
 /**
@@ -146,7 +141,9 @@ function getExplorerUrl(txHash: string): string {
 
 export default function ActionDetail({ action, votingResults }: ActionDetailProps) {
   const status = action.status || 'submitted';
-  const title = getMetadataTitle(action);
+  const title = getActionTitle(action);
+  const displayType = getActionDisplayType(action);
+  const summary = votingResults.summary;
 
   const chartData = [
     {
@@ -184,6 +181,148 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
     BigInt(votingResults.spo_votes.abstain) + 
     BigInt(votingResults.cc_votes.abstain);
 
+  const drepYesCount = votingResults.drep_votes.yes_votes_cast ?? summary?.drep_yes_votes_cast ?? 0;
+  const drepNoCount = votingResults.drep_votes.no_votes_cast ?? summary?.drep_no_votes_cast ?? 0;
+  const drepAbstainCount = votingResults.drep_votes.abstain_votes_cast ?? summary?.drep_abstain_votes_cast ?? 0;
+  const spoYesCount = votingResults.spo_votes.yes_votes_cast ?? summary?.pool_yes_votes_cast ?? 0;
+  const spoNoCount = votingResults.spo_votes.no_votes_cast ?? summary?.pool_no_votes_cast ?? 0;
+  const spoAbstainCount = votingResults.spo_votes.abstain_votes_cast ?? summary?.pool_abstain_votes_cast ?? 0;
+  const ccYesCount = votingResults.cc_votes.yes_votes_cast ?? summary?.committee_yes_votes_cast ?? 0;
+  const ccNoCount = votingResults.cc_votes.no_votes_cast ?? summary?.committee_no_votes_cast ?? 0;
+  const ccAbstainCount = votingResults.cc_votes.abstain_votes_cast ?? summary?.committee_abstain_votes_cast ?? 0;
+
+  const drepVotesCast = sumCounts(drepYesCount, drepNoCount, drepAbstainCount);
+  const spoVotesCast = sumCounts(spoYesCount, spoNoCount, spoAbstainCount);
+  const ccVotesCast = sumCounts(ccYesCount, ccNoCount, ccAbstainCount);
+  const totalVotesCast = sumCounts(drepVotesCast, spoVotesCast, ccVotesCast);
+
+  const yesVotesCountTotal = sumCounts(drepYesCount, spoYesCount, ccYesCount);
+  const noVotesCountTotal = sumCounts(drepNoCount, spoNoCount, ccNoCount);
+  const abstainVotesCountTotal = sumCounts(drepAbstainCount, spoAbstainCount, ccAbstainCount);
+
+  const drepYesPower = summary?.drep_yes_vote_power ?? votingResults.drep_votes.yes;
+  const drepNoPower = summary?.drep_no_vote_power ?? votingResults.drep_votes.no;
+  const drepAbstainPower = summary
+    ? (
+        BigInt(summary.drep_active_abstain_vote_power ?? '0') +
+        BigInt(summary.drep_always_abstain_vote_power ?? '0')
+      ).toString()
+    : votingResults.drep_votes.abstain;
+
+  const spoYesPower = summary?.pool_yes_vote_power ?? votingResults.spo_votes.yes;
+  const spoNoPower = summary?.pool_no_vote_power ?? votingResults.spo_votes.no;
+  const spoAbstainPower = summary
+    ? (
+        BigInt(summary.pool_active_abstain_vote_power ?? '0') +
+        BigInt(summary.pool_passive_always_abstain_vote_power ?? '0')
+      ).toString()
+    : votingResults.spo_votes.abstain;
+
+  const detailSections: DetailSection[] = [
+    {
+      key: 'dreps',
+      title: 'DReps',
+      votesCast: drepVotesCast,
+      entries: [
+        {
+          label: 'Yes',
+          count: drepYesCount,
+          power: drepYesPower,
+          percent: summary?.drep_yes_pct,
+        },
+        {
+          label: 'No',
+          count: drepNoCount,
+          power: drepNoPower,
+          percent: summary?.drep_no_pct,
+        },
+        {
+          label: 'Abstain',
+          count: drepAbstainCount,
+          power: drepAbstainPower,
+        },
+      ],
+      extras: summary
+        ? [
+            {
+              label: 'Always Abstain Power',
+              value: formatAdaValue(summary.drep_always_abstain_vote_power ?? undefined),
+            },
+            {
+              label: 'Always No-Confidence Power',
+              value: formatAdaValue(summary.drep_always_no_confidence_vote_power ?? undefined),
+            },
+          ]
+        : [],
+    },
+    {
+      key: 'spos',
+      title: 'Stake Pools',
+      votesCast: spoVotesCast,
+      entries: [
+        {
+          label: 'Yes',
+          count: spoYesCount,
+          power: spoYesPower,
+          percent: summary?.pool_yes_pct,
+        },
+        {
+          label: 'No',
+          count: spoNoCount,
+          power: spoNoPower,
+          percent: summary?.pool_no_pct,
+        },
+        {
+          label: 'Abstain',
+          count: spoAbstainCount,
+          power: spoAbstainPower,
+        },
+      ],
+      extras: summary
+        ? [
+            {
+              label: 'Passive Always-Abstain Votes',
+              value: formatVoteCount(summary.pool_passive_always_abstain_votes_assigned ?? undefined),
+            },
+            {
+              label: 'Passive Always-Abstain Power',
+              value: formatAdaValue(summary.pool_passive_always_abstain_vote_power ?? undefined),
+            },
+            {
+              label: 'Passive Always No-Confidence Votes',
+              value: formatVoteCount(summary.pool_passive_always_no_confidence_votes_assigned ?? undefined),
+            },
+            {
+              label: 'Passive Always No-Confidence Power',
+              value: formatAdaValue(summary.pool_passive_always_no_confidence_vote_power ?? undefined),
+            },
+          ]
+        : [],
+    },
+    {
+      key: 'cc',
+      title: 'Constitutional Committee',
+      votesCast: ccVotesCast,
+      entries: [
+        {
+          label: 'Yes',
+          count: ccYesCount,
+          percent: summary?.committee_yes_pct,
+        },
+        {
+          label: 'No',
+          count: ccNoCount,
+          percent: summary?.committee_no_pct,
+        },
+        {
+          label: 'Abstain',
+          count: ccAbstainCount,
+        },
+      ],
+      extras: [] as Array<{ label: string; value: string }>,
+    },
+  ];
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -201,7 +340,7 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                 <div className="flex-1">
                   <h1 className="text-3xl font-display font-bold text-foreground mb-4">{title}</h1>
                   <div className="flex items-center space-x-2 mb-4 flex-wrap gap-2">
-                    <Badge variant="default">{formatActionType(action.type)}</Badge>
+                    <Badge variant="default">{formatActionType(displayType)}</Badge>
                     <Badge variant={getStatusVariant(status)}>{status}</Badge>
                     {(action.meta_json || action.metadata) && (
                       <Badge variant="outline" className="flex items-center gap-1">
@@ -229,6 +368,15 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
               {(action.meta_json || action.metadata) && (
                 <div className="mb-6">
                   <ProposalMetadata action={action} />
+                </div>
+              )}
+
+              {action.metadata_checks && (
+                <div className="mb-6">
+                  <MetadataValidationSummary
+                    checks={action.metadata_checks}
+                    metaUrl={action.meta_url}
+                  />
                 </div>
               )}
 
@@ -397,13 +545,24 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
             </CardContent>
           </Card>
 
-          {/* Voting Results Chart */}
+          {/* Voting Insights */}
           <Card>
-            <CardHeader>
-              <CardTitle>Voting Results</CardTitle>
+            <CardHeader className="pb-0">
+              <CardTitle>Voting Insights</CardTitle>
             </CardHeader>
             <CardContent>
-              <VotingChart data={chartData} />
+              <Tabs defaultValue="breakdown">
+                <TabsList className="mt-4">
+                  <TabsTrigger value="breakdown">By Voter Type</TabsTrigger>
+                  <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                </TabsList>
+                <TabsContent value="breakdown" className="mt-6">
+                  <VotingChart data={chartData} />
+                </TabsContent>
+                <TabsContent value="timeline" className="mt-6">
+                  <VotingTimelineChart timeline={votingResults.vote_timeline} />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
@@ -482,6 +641,96 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                     </div>
                   </div>
                 </div>
+
+                {(totalVotesCast > 0 || summary) && (
+                  <div className="space-y-6 pt-4 border-t border-border">
+                    {totalVotesCast > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Total Ballots Cast</span>
+                          <span className="text-sm font-semibold">{formatVoteLabel(totalVotesCast)}</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div className="rounded-md bg-muted/40 p-3">
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">Yes</p>
+                            <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                              {formatVoteCount(yesVotesCountTotal)}
+                            </p>
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-3">
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">No</p>
+                            <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                              {formatVoteCount(noVotesCountTotal)}
+                            </p>
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-3">
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">Abstain</p>
+                            <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                              {formatVoteCount(abstainVotesCountTotal)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {summary && (
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          Detailed Breakdown by Voter Type
+                        </h4>
+                        <div className="space-y-4">
+                          {detailSections.map((section) => (
+                            <div
+                              key={section.key}
+                              className="space-y-4 rounded-lg border border-border/60 bg-muted/30 p-4"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-foreground">{section.title}</span>
+                                {section.votesCast > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatVoteLabel(section.votesCast)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                {section.entries.map((entry) => (
+                                  <div key={entry.label} className="space-y-1">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                      {entry.label}
+                                    </p>
+                                    <p className="text-base font-semibold text-foreground">
+                                      {formatVoteCount(entry.count)}
+                                    </p>
+                                    {entry.percent !== undefined && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatPercent(entry.percent)}
+                                      </p>
+                                    )}
+                                    {entry.power && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatAdaValue(entry.power)}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {section.extras.length > 0 && (
+                                <div className="grid gap-2 border-t border-border/60 pt-3 text-xs sm:text-sm">
+                                  {section.extras.map((extra) => (
+                                    <div key={extra.label} className="flex items-center justify-between gap-3">
+                                      <span className="text-muted-foreground">{extra.label}</span>
+                                      <span className="font-medium text-foreground">{extra.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

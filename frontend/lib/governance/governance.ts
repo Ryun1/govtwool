@@ -5,6 +5,9 @@ import type {
   ActionVotingBreakdown,
   DRepDelegator,
   DRepStatsSummary,
+  VoteCounts,
+  ProposalVotingSummary,
+  VoteTimelinePoint,
 } from '@/types/governance';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -485,46 +488,99 @@ export async function getActionVotingResults(actionId: string): Promise<ActionVo
         total_voting_power: '0',
       };
     }
+    const parseOptionalNumber = (value: unknown): number | undefined => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
+
+    const parseVoteCounts = (value: unknown): VoteCounts => {
+      if (!isRecord(value)) {
+        return { yes: '0', no: '0', abstain: '0' };
+      }
+
+      return {
+        yes: String(value.yes ?? '0'),
+        no: String(value.no ?? '0'),
+        abstain: String(value.abstain ?? '0'),
+        yes_votes_cast: parseOptionalNumber(value.yes_votes_cast),
+        no_votes_cast: parseOptionalNumber(value.no_votes_cast),
+        abstain_votes_cast: parseOptionalNumber(value.abstain_votes_cast),
+      };
+    };
+
+    const parseTimeline = (value: unknown): VoteTimelinePoint[] | undefined => {
+      if (!Array.isArray(value)) {
+        return undefined;
+      }
+
+      const points = value
+        .map((entry) => {
+          if (!isRecord(entry)) {
+            return undefined;
+          }
+
+          const timestamp = parseOptionalNumber(entry.timestamp);
+          const yesVotes = parseOptionalNumber(entry.yes_votes);
+          const noVotes = parseOptionalNumber(entry.no_votes);
+          const abstainVotes = parseOptionalNumber(entry.abstain_votes);
+
+          const yesPower = typeof entry.yes_power === 'string' ? entry.yes_power : String(entry.yes_power ?? '0');
+          const noPower = typeof entry.no_power === 'string' ? entry.no_power : String(entry.no_power ?? '0');
+          const abstainPower = typeof entry.abstain_power === 'string' ? entry.abstain_power : String(entry.abstain_power ?? '0');
+
+          if (
+            timestamp === undefined ||
+            yesVotes === undefined ||
+            noVotes === undefined ||
+            abstainVotes === undefined
+          ) {
+            return undefined;
+          }
+
+          return {
+            timestamp,
+            yes_votes: yesVotes,
+            no_votes: noVotes,
+            abstain_votes: abstainVotes,
+            yes_power: yesPower,
+            no_power: noPower,
+            abstain_power: abstainPower,
+          } satisfies VoteTimelinePoint;
+        })
+        .filter((point): point is VoteTimelinePoint => point !== undefined);
+
+      return points.length > 0 ? points : undefined;
+    };
+
+    const summary = isRecord(breakdown.summary)
+      ? (breakdown.summary as ProposalVotingSummary)
+      : undefined;
 
     return {
-      drep_votes: isRecord(breakdown.drep_votes)
-        ? {
-            yes: String(breakdown.drep_votes.yes ?? '0'),
-            no: String(breakdown.drep_votes.no ?? '0'),
-            abstain: String(breakdown.drep_votes.abstain ?? '0'),
-          }
-        : { yes: '0', no: '0', abstain: '0' },
-      spo_votes: isRecord(breakdown.spo_votes)
-        ? {
-            yes: String(breakdown.spo_votes.yes ?? '0'),
-            no: String(breakdown.spo_votes.no ?? '0'),
-            abstain: String(breakdown.spo_votes.abstain ?? '0'),
-          }
-        : { yes: '0', no: '0', abstain: '0' },
-      cc_votes: isRecord(breakdown.cc_votes)
-        ? {
-            yes: String(breakdown.cc_votes.yes ?? '0'),
-            no: String(breakdown.cc_votes.no ?? '0'),
-            abstain: String(breakdown.cc_votes.abstain ?? '0'),
-          }
-        : { yes: '0', no: '0', abstain: '0' },
+      drep_votes: parseVoteCounts(breakdown.drep_votes),
+      spo_votes: parseVoteCounts(breakdown.spo_votes),
+      cc_votes: parseVoteCounts(breakdown.cc_votes),
       total_voting_power: String(breakdown.total_voting_power ?? '0'),
+      summary,
+      vote_timeline: parseTimeline(breakdown.vote_timeline),
     };
   } catch (error: unknown) {
-    if (isNotFoundError(error)) {
-      return {
-        drep_votes: { yes: '0', no: '0', abstain: '0' },
-        spo_votes: { yes: '0', no: '0', abstain: '0' },
-        cc_votes: { yes: '0', no: '0', abstain: '0' },
-        total_voting_power: '0',
-      };
-    }
-    console.error('Error fetching voting results:', error);
-    return {
+    const fallback: ActionVotingBreakdown = {
       drep_votes: { yes: '0', no: '0', abstain: '0' },
       spo_votes: { yes: '0', no: '0', abstain: '0' },
       cc_votes: { yes: '0', no: '0', abstain: '0' },
       total_voting_power: '0',
     };
+    if (isNotFoundError(error)) {
+      return fallback;
+    }
+    console.error('Error fetching voting results:', error);
+    return fallback;
   }
 }
