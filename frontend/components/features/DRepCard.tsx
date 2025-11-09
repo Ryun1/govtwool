@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { memo, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader } from '../ui/Card';
+import { useRouter } from 'next/navigation';
+import { memo, useMemo } from 'react';
+import { Card, CardContent, CardFooter, CardHeader } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { Users, TrendingUp, ExternalLink, Vote, Shield } from 'lucide-react';
+import { Users, TrendingUp, ExternalLink, Vote, Shield, ArrowRight } from 'lucide-react';
 import type { DRep, DRepExternalReference, DRepMetadata } from '@/types/governance';
 import { isSpecialSystemDRep } from '@/lib/governance/drep-id';
 import { getSystemDRepInfo } from '@/lib/governance';
@@ -61,6 +62,7 @@ const selectWebsite = (metadataWebsite: string | undefined, links?: DRepExternal
 };
 
 function DRepCard({ drep }: DRepCardProps) {
+  const router = useRouter();
   const isSystemDRep = isSpecialSystemDRep(drep.drep_id);
   const systemDRepInfo = isSystemDRep ? getSystemDRepInfo(drep.drep_id) : null;
 
@@ -114,140 +116,172 @@ function DRepCard({ drep }: DRepCardProps) {
   const delegatorCount = drep.delegator_count;
   const voteCount = drep.vote_count;
 
-  const handleWebsiteClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
-      if (website) {
-        try {
-          if (typeof window !== 'undefined') {
-            window.open(website, '_blank', 'noopener,noreferrer');
-          }
-        } catch (error) {
-          console.error('Failed to open DRep website', error);
-        }
-      }
-    },
-    [website]
-  );
+  const navigateToProfile = () => {
+    router.push(`/dreps/${drep.drep_id}`);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      navigateToProfile();
+    }
+  };
 
   return (
-    <Link href={`/dreps/${drep.drep_id}`} className="block h-full">
-      <Card
-        className={cn(
-          'h-full cursor-pointer border-2 transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover',
-          isSystemDRep
-            ? 'border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-purple-600/5 hover:border-purple-500/50'
-            : 'hover:border-field-green/50'
-        )}
-      >
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex items-center gap-2">
-                {isSystemDRep && systemDRepInfo?.icon && (
-                  <span className="shrink-0 text-xl" aria-hidden="true">
-                    {systemDRepInfo.icon}
-                  </span>
-                )}
-                <h3 className="truncate text-lg font-semibold text-foreground">{drepName}</h3>
-                {isSystemDRep && (
-                  <Badge
-                    variant="info"
-                    className="shrink-0 bg-purple-500/20 text-xs text-purple-300"
-                  >
-                    <Shield className="mr-1 h-3 w-3" />
-                    System
-                  </Badge>
-                )}
-                {hasProfile && !isSystemDRep && (
-                  <Badge variant="info" className="shrink-0 text-xs">
-                    Profile
-                  </Badge>
-                )}
-              </div>
-              {showDrepId && (
-                <p className="mb-1 font-mono text-xs text-muted-foreground">{drep.drep_id.slice(0, 8)}...</p>
+    <Card
+      role="link"
+      tabIndex={0}
+      aria-label={`View DRep profile for ${drepName}`}
+      onClick={navigateToProfile}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        'group flex h-full cursor-pointer flex-col border-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:-translate-y-1 hover:shadow-card-hover',
+        isSystemDRep
+          ? 'border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-purple-600/5 hover:border-purple-500/50'
+          : 'hover:border-field-green/50'
+      )}
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-2">
+              {isSystemDRep && systemDRepInfo?.icon && (
+                <span className="shrink-0 text-xl" aria-hidden="true">
+                  {systemDRepInfo.icon}
+                </span>
               )}
-              {derivedDescription && (
-                <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">{derivedDescription}</p>
-              )}
-              <div className="flex items-center gap-2">
+              <h3 className="truncate text-lg font-semibold text-foreground">{drepName}</h3>
+              {isSystemDRep && (
                 <Badge
-                  variant={status === 'active' ? 'success' : status === 'retired' ? 'error' : 'default'}
-                  className="shrink-0 capitalize"
+                  variant="info"
+                  className="shrink-0 bg-purple-500/20 text-xs text-purple-200"
                 >
-                  {status}
+                  <Shield className="mr-1 h-3 w-3" aria-hidden="true" />
+                  System
                 </Badge>
-                {drep.last_vote_epoch && (
-                  <span className="text-xs text-muted-foreground">Last vote: Epoch {drep.last_vote_epoch}</span>
-                )}
-                {drep.votes_last_year !== undefined && (
-                  <span className="text-xs text-muted-foreground">
-                    Votes (12M): {drep.votes_last_year.toLocaleString()}
-                  </span>
-                )}
-              </div>
+              )}
+              {hasProfile && !isSystemDRep && (
+                <Badge variant="info" className="shrink-0 text-xs">
+                  Profile
+                </Badge>
+              )}
+            </div>
+            {showDrepId && (
+              <p className="font-mono text-xs text-muted-foreground">
+                {drep.drep_id.slice(0, 12)}…
+              </p>
+            )}
+            {derivedDescription && (
+              <p className="line-clamp-2 text-sm text-muted-foreground">{derivedDescription}</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Badge
+                variant={status === 'active' ? 'success' : status === 'retired' ? 'error' : 'default'}
+                className="shrink-0 capitalize"
+              >
+                {status}
+              </Badge>
+              {drep.last_vote_epoch && (
+                <span className="text-xs text-muted-foreground">
+                  Last vote: Epoch {drep.last_vote_epoch}
+                </span>
+              )}
+              {drep.votes_last_year !== undefined && (
+                <span className="text-xs text-muted-foreground">
+                  Votes (12M): {drep.votes_last_year.toLocaleString()}
+                </span>
+              )}
             </div>
           </div>
-        </CardHeader>
+        </div>
+      </CardHeader>
 
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <CardContent className="flex-1 pt-0">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5">
+            <div className="shrink-0 rounded-md bg-field-green/10 p-1.5">
+              <TrendingUp className="h-4 w-4 text-field-green" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Power</p>
+              <p className="truncate text-sm font-semibold text-foreground">{votingPower}</p>
+            </div>
+          </div>
+
+          {delegatorCount !== undefined && (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5">
-              <div className="shrink-0 rounded-md bg-field-green/10 p-1.5">
-                <TrendingUp className="h-4 w-4 text-field-green" />
+              <div className="shrink-0 rounded-md bg-sky-blue/10 p-1.5">
+                <Users className="h-4 w-4 text-sky-blue" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Power</p>
-                <p className="truncate text-sm font-semibold text-foreground">{votingPower}</p>
+                <p className="text-xs text-muted-foreground">Delegators</p>
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {formatNumber(delegatorCount)}
+                </p>
               </div>
             </div>
+          )}
 
-            {delegatorCount !== undefined && (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5">
-                <div className="shrink-0 rounded-md bg-sky-blue/10 p-1.5">
-                  <Users className="h-4 w-4 text-sky-blue" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Delegators</p>
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {formatNumber(delegatorCount)}
-                  </p>
-                </div>
+          {voteCount !== undefined && (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5">
+              <div className="shrink-0 rounded-md bg-field-dark/10 p-1.5">
+                <Vote className="h-4 w-4 text-field-dark" aria-hidden="true" />
               </div>
-            )}
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Votes</p>
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {formatNumber(voteCount)}
+                </p>
+              </div>
+            </div>
+          )}
 
-            {voteCount !== undefined && (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5">
-                <div className="shrink-0 rounded-md bg-field-dark/10 p-1.5">
-                  <Vote className="h-4 w-4 text-field-dark" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Votes</p>
-                  <p className="truncate text-sm font-semibold text-foreground">{formatNumber(voteCount)}</p>
-                </div>
+          {website && (
+            <a
+              href={website}
+              target="_blank"
+              rel="noreferrer noopener"
+              onClick={(event) => event.stopPropagation()}
+              className="col-span-2 flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5 text-sm font-medium text-primary hover:text-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:col-span-3"
+            >
+              <div className="shrink-0 rounded-md bg-primary/10 p-1.5">
+                <ExternalLink className="h-4 w-4 text-primary" aria-hidden="true" />
               </div>
-            )}
+              <span className="truncate">
+                {website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              </span>
+              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="sr-only">Opens in a new tab</span>
+            </a>
+          )}
+        </div>
+      </CardContent>
 
-            {website && (
-              <div className="col-span-2 flex items-center gap-2 rounded-md border border-border bg-muted/50 p-2.5 sm:col-span-3">
-                <div className="shrink-0 rounded-md bg-primary/10 p-1.5">
-                  <ExternalLink className="h-4 w-4 text-primary" />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleWebsiteClick}
-                  className="flex flex-1 items-center gap-1 truncate text-left text-sm font-medium text-primary hover:underline"
-                >
-                  <span className="truncate">{website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                </button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+      <CardFooter className="mt-auto flex items-center justify-between border-t border-border/60 bg-muted/40">
+        <Link
+          href={`/dreps/${drep.drep_id}`}
+          onClick={(event) => event.stopPropagation()}
+          className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          aria-label={`View full profile for ${drepName}`}
+        >
+          View profile
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+        {website && (
+          <a
+            href={website}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={(event) => event.stopPropagation()}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+          >
+            Visit site
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">Opens in a new tab</span>
+          </a>
+        )}
+      </CardFooter>
+    </Card>
   );
 }
 

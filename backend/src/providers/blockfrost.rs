@@ -509,9 +509,7 @@ impl Provider for BlockfrostProvider {
                 stake_address: stake_address.to_string(),
                 delegated_pool: account["pool_id"].as_str().map(|s| s.to_string()),
                 delegated_drep: account["drep_id"].as_str().map(|s| s.to_string()),
-                total_balance: account["controlled_amount"]
-                    .as_str()
-                    .map(|s| s.to_string()),
+                total_balance: account["controlled_amount"].as_str().map(|s| s.to_string()),
                 utxo_balance: account["withdrawable_amount"]
                     .as_str()
                     .map(|s| s.to_string()),

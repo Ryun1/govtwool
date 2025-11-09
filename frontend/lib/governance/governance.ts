@@ -1,4 +1,11 @@
-import type { DRep, GovernanceAction, DRepVotingHistory, ActionVotingBreakdown, DRepDelegator } from '@/types/governance';
+import type {
+  DRep,
+  GovernanceAction,
+  DRepVotingHistory,
+  ActionVotingBreakdown,
+  DRepDelegator,
+  DRepStatsSummary,
+} from '@/types/governance';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -72,9 +79,9 @@ export function getSystemDRepInfo(drepId: string): { name: string; description: 
 }
 
 /**
- * Get total active DReps count from backend
+ * Get DRep statistics from backend
  */
-export async function getTotalActiveDReps(): Promise<number | null> {
+export async function getDRepStats(): Promise<DRepStatsSummary | null> {
   try {
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/dreps/stats`, {
@@ -86,10 +93,35 @@ export async function getTotalActiveDReps(): Promise<number | null> {
     }
     
     const data = await response.json();
-    return data.active_dreps_count || null;
+    if (!isRecord(data)) {
+      return null;
+    }
+
+    return {
+      active_dreps_count:
+        typeof data.active_dreps_count === 'number' ? data.active_dreps_count : null,
+      total_dreps_count:
+        typeof data.total_dreps_count === 'number' ? data.total_dreps_count : null,
+      total_voting_power:
+        typeof data.total_voting_power === 'string' ? data.total_voting_power : null,
+      top_drep:
+        isRecord(data.top_drep) && typeof data.top_drep.drep_id === 'string'
+          ? {
+              drep_id: data.top_drep.drep_id,
+              name: typeof data.top_drep.name === 'string' ? data.top_drep.name : undefined,
+              voting_power:
+                typeof data.top_drep.voting_power === 'string' ? data.top_drep.voting_power : undefined,
+            }
+          : null,
+    };
   } catch (error) {
-    console.error('Error fetching total active DReps:', error);
-    return null;
+    console.error('Error fetching DRep stats:', error);
+    return {
+      active_dreps_count: null,
+      total_dreps_count: null,
+      total_voting_power: null,
+      top_drep: null,
+    };
   }
 }
 

@@ -507,12 +507,8 @@ impl Provider for KoiosProvider {
             if let Some(account) = arr.first() {
                 return Ok(Some(StakeDelegation {
                     stake_address: stake_address.to_string(),
-                    delegated_pool: account["delegated_pool"]
-                        .as_str()
-                        .map(|s| s.to_string()),
-                    delegated_drep: account["delegated_drep"]
-                        .as_str()
-                        .map(|s| s.to_string()),
+                    delegated_pool: account["delegated_pool"].as_str().map(|s| s.to_string()),
+                    delegated_drep: account["delegated_drep"].as_str().map(|s| s.to_string()),
                     total_balance: account["total_balance"]
                         .as_str()
                         .map(|s| s.to_string())

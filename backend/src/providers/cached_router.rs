@@ -89,6 +89,111 @@ impl CachedProviderRouter {
         Ok(result)
     }
 
+    pub async fn get_drep_stats(&self) -> Result<DRepStats, anyhow::Error> {
+        let cache_key = CacheKey::DRepStats;
+
+        if let Some(cached) = self.cache.get::<DRepStats>(&cache_key).await {
+            debug!("Cache hit for DRep stats");
+            return Ok(cached);
+        }
+
+        debug!("Cache miss for DRep stats, aggregating metrics");
+
+        let active_count = self.router.get_total_active_dreps().await?;
+        let mut total_count: u64 = 0;
+        let mut reported_total: Option<u64> = None;
+        let mut total_voting_power: u128 = 0;
+        let mut top_candidate: Option<(String, Option<String>, u128)> = None;
+
+        let mut page = 1u32;
+        const PAGE_SIZE: u32 = 200;
+        const MAX_PAGES: u32 = 50;
+
+        loop {
+            let query = DRepsQuery {
+                page,
+                count: PAGE_SIZE,
+                statuses: Vec::new(),
+                search: None,
+                sort: Some("VotingPower".to_string()),
+                direction: Some("Descending".to_string()),
+                enrich: false,
+            }
+            .with_defaults();
+
+            let page_result = match self.fetch_stats_page(&query).await {
+                Ok(result) => result,
+                Err(error) => {
+                    tracing::debug!("Failed to fetch DRep stats page {}: {}", page, error);
+                    break;
+                }
+            };
+
+            if reported_total.is_none() {
+                reported_total = page_result.total;
+            }
+
+            if page_result.dreps.is_empty() {
+                break;
+            }
+
+            for drep in &page_result.dreps {
+                total_count = total_count.saturating_add(1);
+
+                if let Some(power) = Self::extract_voting_power(drep) {
+                    total_voting_power = total_voting_power.saturating_add(power);
+
+                    match &top_candidate {
+                        Some((_, _, current_power)) if &power <= current_power => {}
+                        _ => {
+                            let name = drep
+                                .given_name
+                                .clone()
+                                .or_else(|| {
+                                    drep.metadata.as_ref().and_then(|meta| {
+                                        meta.extra
+                                            .get("name")
+                                            .and_then(|value| value.as_str().map(|s| s.to_string()))
+                                    })
+                                })
+                                .or_else(|| drep.view.clone());
+                            top_candidate = Some((drep.drep_id.clone(), name, power));
+                        }
+                    }
+                }
+            }
+
+            if !page_result.has_more || page >= MAX_PAGES {
+                break;
+            }
+
+            page = page.saturating_add(1);
+        }
+
+        let total_count = reported_total.unwrap_or(total_count);
+        let total_voting_power = if total_voting_power > 0 {
+            Some(total_voting_power.to_string())
+        } else {
+            None
+        };
+
+        let top_drep = top_candidate.map(|(id, name, power)| DRepLeader {
+            drep_id: id,
+            name,
+            voting_power: Some(power.to_string()),
+        });
+
+        let stats = DRepStats {
+            active_dreps_count: active_count,
+            total_dreps_count: Some(total_count),
+            total_voting_power,
+            top_drep,
+        };
+
+        self.cache.set(&cache_key, &stats).await;
+        Ok(stats)
+    }
+
     pub async fn get_drep(&self, id: &str) -> Result<Option<DRep>, anyhow::Error> {
         let cache_key = CacheKey::DRep { id: id.to_string() };
 
@@ -248,27 +353,6 @@ impl CachedProviderRouter {
                 // Store in cache
                 self.cache.set(&cache_key, &metadata).await;
                 Ok(Some(metadata))
-            }
-            None => Ok(None),
-        }
-    }
-
-    pub async fn get_total_active_dreps(&self) -> Result<Option<u32>, anyhow::Error> {
-        let cache_key = CacheKey::DRepStats;
-
-        // Check cache first
-        if let Some(cached) = self.cache.get::<u32>(&cache_key).await {
-            debug!("Cache hit for DRep stats");
-            return Ok(Some(cached));
-        }
-
-        // Cache miss - fetch from provider
-        debug!("Cache miss for DRep stats, fetching from provider");
-        match self.router.get_total_active_dreps().await? {
-            Some(count) => {
-                // Store in cache
-                self.cache.set(&cache_key, &count).await;
-                Ok(Some(count))
             }
             None => Ok(None),
         }
@@ -436,6 +520,41 @@ impl CachedProviderRouter {
         }
 
         drep
+    }
+
+    async fn fetch_stats_page(&self, query: &DRepsQuery) -> Result<DRepsPage, anyhow::Error> {
+        if let Some(provider) = &self.govtools {
+            match provider.list_dreps(query).await {
+                Ok(result) => return Ok(result),
+                Err(error) => {
+                    tracing::debug!(
+                        "GovTools list failed for stats page {}: {}",
+                        query.normalized_page(),
+                        error
+                    );
+                }
+            }
+        }
+
+        self.router.get_dreps_page(query).await
+    }
+
+    fn extract_voting_power(drep: &DRep) -> Option<u128> {
+        let candidates = [
+            drep.amount.as_deref(),
+            drep.voting_power_active.as_deref(),
+            drep.voting_power.as_deref(),
+        ];
+
+        for candidate in candidates {
+            if let Some(value) = candidate {
+                if let Ok(parsed) = value.parse::<u128>() {
+                    return Some(parsed);
+                }
+            }
+        }
+
+        None
     }
 
     fn extract_hex_id(drep: &DRep) -> Option<String> {
