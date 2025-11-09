@@ -94,9 +94,10 @@ impl MetadataValidator {
         if let Some(resolved) = fetched_metadata.as_ref() {
             result.resolved_url = Some(resolved.url.clone());
             if let Some(bytes) = resolved.bytes_read {
-                result
-                    .notes
-                    .push(format!("Fetched {} bytes of metadata for hash validation", bytes));
+                result.notes.push(format!(
+                    "Fetched {} bytes of metadata for hash validation",
+                    bytes
+                ));
             }
         }
 
@@ -116,7 +117,7 @@ impl MetadataValidator {
             .or_else(|| fetched_metadata.as_ref().and_then(|f| f.document.clone()));
 
         let verifier_payload = metadata_document.as_ref().and_then(|value| {
-            if value.is_object() {
+            let object = if value.is_object() {
                 Some(value.clone())
             } else if let Some(stringified) = value.as_str() {
                 serde_json::from_str::<serde_json::Value>(stringified)
@@ -124,6 +125,18 @@ impl MetadataValidator {
                     .filter(|parsed| parsed.is_object())
             } else {
                 None
+            }?;
+
+            let authors = object
+                .get("authors")
+                .and_then(|value| value.as_array())
+                .map(|arr| arr.iter().filter(|author| !author.is_null()).count())
+                .unwrap_or_default();
+
+            if authors == 0 {
+                None
+            } else {
+                Some(object)
             }
         });
 
@@ -144,9 +157,8 @@ impl MetadataValidator {
                         }
                     },
                     None => {
-                        result.author_witness = CheckOutcome::unknown(
-                            "Metadata JSON unavailable for author witness verification",
-                        );
+                        result.author_witness =
+                            CheckOutcome::fail("Metadata contains no author witness data");
                     }
                 }
             }
@@ -441,8 +453,7 @@ impl MetadataValidator {
             });
         };
 
-        let mut notes =
-            vec!["Author witnesses signatures valid".to_string()];
+        let mut notes = vec!["Author witnesses signatures valid".to_string()];
 
         let reported_failure = matches!(data.result, Some(false));
 
@@ -460,9 +471,7 @@ impl MetadataValidator {
         if total == 0 {
             notes.push("No author witnesses returned by verifier.".to_string());
             return Ok(AuthorVerifierOutcome {
-                outcome: CheckOutcome::warning(
-                    "Cardano Foundation verifier returned no author witnesses",
-                ),
+                outcome: CheckOutcome::warning("No author witnesses provided"),
                 notes,
             });
         }
