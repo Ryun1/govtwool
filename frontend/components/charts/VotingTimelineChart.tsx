@@ -11,7 +11,6 @@ import {
   YAxis,
   Tooltip,
   Legend,
-  type TooltipProps,
 } from 'recharts';
 
 interface VotingTimelineChartProps {
@@ -35,9 +34,13 @@ function formatTimestamp(timestamp: number): string {
   }
 }
 
-function TimelineTooltip(props: TooltipProps<number, string>) {
-  const { active, payload } = props;
+type TimelineTooltipProps = {
+  active?: boolean;
+  label?: number | string;
+  payload?: Array<{ payload?: TimelineDatum }>;
+};
 
+function TimelineTooltip({ active, payload, label }: TimelineTooltipProps) {
   if (!active || !payload || payload.length === 0) {
     return null;
   }
@@ -47,8 +50,7 @@ function TimelineTooltip(props: TooltipProps<number, string>) {
     return null;
   }
 
-  const labelValue =
-    typeof props.label === 'number' ? props.label : item.timestamp;
+  const labelValue = typeof label === 'number' ? label : item.timestamp;
 
   return (
     <div className="rounded-md border border-border bg-background/95 px-4 py-3 shadow-md backdrop-blur">
