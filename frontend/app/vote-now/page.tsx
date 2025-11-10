@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useWallet } from '@/hooks/useWallet';
+import { useWalletContext } from '@/components/layout/WalletProvider';
 import { getGovernanceActionsPage } from '@/lib/governance/governance';
 import { getActionTitle, getActionDescription } from '@/lib/governance/action-helpers';
 import type { GovernanceAction } from '@/types/governance';
@@ -21,13 +21,14 @@ const MAX_CHAR_LIMITS = {
 };
 
 export default function VoteNowPage() {
-  // Multi-step state
+  
+  // Wallet & voter identification
+  const { connectedWallet } = useWalletContext();
+  const [drepId, setDrepId] = useState<string>('');
+
+    // Multi-step state
   const [step, setStep] = useState<Step>('voter-id');
   const [error, setError] = useState<string>('');
-
-  // Wallet & voter identification
-  const { connectedWallet } = useWallet();
-  const [drepId, setDrepId] = useState<string>('');
 
   // Proposal selection
   const [proposals, setProposals] = useState<GovernanceAction[]>([]);
@@ -70,12 +71,25 @@ export default function VoteNowPage() {
 
   // Auto-populate DRep ID from wallet if available
   useEffect(() => {
-    if (connectedWallet?.address) {
-      // In a real implementation, you would derive the DRep ID from the wallet
-      // For now, we'll just show a placeholder
-      setDrepId(''); // User must enter manually or derive from wallet
+    let cancelled = false;
+    async function fetchDRepId() {
+      if (connectedWallet && !drepId) {
+        try {
+          // Use wallet.getDRep() to get DRep ID
+          if (connectedWallet.wallet && typeof connectedWallet.wallet.getDRep === 'function') {
+            const dRep = await connectedWallet.wallet.getDRep();
+            if (dRep?.dRepIDCip105 && !cancelled) {
+              setDrepId(dRep.dRepIDCip105);
+            }
+          }
+        } catch (err) {
+          // Fallback: leave drepId empty
+        }
+      }
     }
-  }, [connectedWallet]);
+    fetchDRepId();
+    return () => { cancelled = true; };
+  }, [connectedWallet, drepId]);
 
   // Auto-select proposal if pre-selected from URL
   useEffect(() => {
@@ -439,17 +453,6 @@ export default function VoteNowPage() {
               </p>
             </div>
 
-            {connectedWallet && (
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Wallet Connected:</strong> {connectedWallet.name}
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 font-mono">
-                  {connectedWallet.address}
-                </p>
-              </div>
-            )}
-
             <div>
               <label htmlFor="drep-id" className="block text-sm font-medium mb-2">
                 DRep ID *
@@ -461,10 +464,17 @@ export default function VoteNowPage() {
                 onChange={(e) => setDrepId(e.target.value)}
                 placeholder="drep1..."
                 className="w-full px-4 py-2 border border-input rounded-md bg-background font-mono text-sm"
+                autoComplete="off"
+                readOnly={!!connectedWallet && !!drepId}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Your registered DRep identifier (CIP-105 or CIP-129 format)
               </p>
+              {connectedWallet && drepId && (
+                <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 font-mono">
+                  <span className="font-semibold">Auto-filled from wallet:</span> {connectedWallet.stakeAddress}
+                </div>
+              )}
             </div>
 
             {error && (
