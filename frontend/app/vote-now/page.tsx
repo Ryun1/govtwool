@@ -170,14 +170,14 @@ export default function VoteNowPage() {
         },
       },
       hashAlgorithm: 'blake2b-256',
-    //   authors: [
+      authors: [
     //     {
     //       name: authorName,
     //       witness: {
     //         witnessAlgorithm: 'ed25519',
     //       },
     //     },
-    //   ],
+      ],
       body: {
         summary,
         rationaleStatement,
