@@ -14,10 +14,11 @@ type Step = 'voter-id' | 'proposal' | 'vote-choice' | 'rationale' | 'ipfs-config
 type IpfsProvider = 'pinata' | 'blockfrost';
 
 const MAX_CHAR_LIMITS = {
-  title: 200,
-  abstract: 500,
-  motivation: 1000,
-  rationale: 2000,
+  summary: 300, // CIP-136: Short summary
+  rationaleStatement: 5000, // CIP-136: Long form rationale
+  precedentDiscussion: 3000, // CIP-136: Optional precedent discussion
+  counterargumentDiscussion: 3000, // CIP-136: Optional counterargument discussion
+  conclusion: 1000, // CIP-136: Optional conclusion
 };
 
 export default function VoteNowPage() {
@@ -39,12 +40,14 @@ export default function VoteNowPage() {
   // Vote choice
   const [voteChoice, setVoteChoice] = useState<VoteChoice | null>(null);
 
-  // Rationale fields (CIP-108)
-  const [authorName, setAuthorName] = useState('');
-  const [title, setTitle] = useState('');
-  const [abstract, setAbstract] = useState('');
-  const [motivation, setMotivation] = useState('');
-  const [rationale, setRationale] = useState('');
+  // Rationale fields (CIP-136)
+ // const [authorName, setAuthorName] = useState('');
+  const [summary, setSummary] = useState('');
+  const [rationaleStatement, setRationaleStatement] = useState('');
+  const [precedentDiscussion, setPrecedentDiscussion] = useState('');
+  const [counterargumentDiscussion, setCounterargumentDiscussion] = useState('');
+  const [conclusion, setConclusion] = useState('');
+  const [references, setReferences] = useState<Array<{ type: 'GovernanceMetadata' | 'Other' | 'RelevantArticles'; label: string; uri: string }>>([]);
 
   // IPFS configuration
   const [ipfsProvider, setIpfsProvider] = useState<IpfsProvider>('pinata');
@@ -127,29 +130,67 @@ export default function VoteNowPage() {
       '@context': {
         '@language': 'en-us',
         CIP100: 'https://github.com/cardano-foundation/CIPs/blob/master/CIP-0100/README.md#',
-        CIP108: 'https://github.com/cardano-foundation/CIPs/blob/master/CIP-0108/README.md#',
+        CIP136: 'https://github.com/cardano-foundation/CIPs/blob/master/CIP-0136/README.md#',
         hashAlgorithm: 'CIP100:hashAlgorithm',
         body: {
-          '@id': 'CIP108:body',
+          '@id': 'CIP136:body',
+          '@context': {
+            references: {
+              '@id': 'CIP100:references',
+              '@container': '@set',
+              '@context': {
+                GovernanceMetadata: 'CIP100:GovernanceMetadataReference',
+                Other: 'CIP100:OtherReference',
+                label: 'CIP100:reference-label',
+                uri: 'CIP100:reference-uri',
+                RelevantArticles: 'CIP136:RelevantArticles',
+              },
+            },
+            summary: 'CIP136:summary',
+            rationaleStatement: 'CIP136:rationaleStatement',
+            precedentDiscussion: 'CIP136:precedentDiscussion',
+            counterargumentDiscussion: 'CIP136:counterargumentDiscussion',
+            conclusion: 'CIP136:conclusion',
+          },
         },
         authors: {
           '@id': 'CIP100:authors',
+          '@container': '@set',
+          '@context': {
+            name: 'http://xmlns.com/foaf/0.1/name',
+            witness: {
+              '@id': 'CIP100:witness',
+              '@context': {
+                witnessAlgorithm: 'CIP100:witnessAlgorithm',
+                publicKey: 'CIP100:publicKey',
+                signature: 'CIP100:signature',
+              },
+            },
+          },
         },
       },
       hashAlgorithm: 'blake2b-256',
-      authors: [
-        {
-          name: authorName,
-          witness: {
-            witnessAlgorithm: 'ed25519',
-          },
-        },
-      ],
+    //   authors: [
+    //     {
+    //       name: authorName,
+    //       witness: {
+    //         witnessAlgorithm: 'ed25519',
+    //       },
+    //     },
+    //   ],
       body: {
-        title,
-        abstract,
-        motivation,
-        rationale,
+        summary,
+        rationaleStatement,
+        ...(precedentDiscussion && { precedentDiscussion }),
+        ...(counterargumentDiscussion && { counterargumentDiscussion }),
+        ...(conclusion && { conclusion }),
+        ...(references.length > 0 && {
+          references: references.map(ref => ({
+            '@type': ref.type,
+            label: ref.label,
+            uri: ref.uri,
+          })),
+        }),
       },
     };
   };
@@ -277,25 +318,21 @@ export default function VoteNowPage() {
   };
 
   const handleNextFromRationale = () => {
-    // Validate required fields for CIP-108
-    if (!authorName.trim()) {
-      setError('Author name is required');
+    // Validate required fields for CIP-136
+    // if (!authorName.trim()) {
+    //   setError('Author name is required');
+    //   return;
+    // }
+    if (!summary.trim()) {
+      setError('Summary is required');
       return;
     }
-    if (!title.trim()) {
-      setError('Title is required');
+    if (summary.length > MAX_CHAR_LIMITS.summary) {
+      setError(`Summary must be ${MAX_CHAR_LIMITS.summary} characters or less`);
       return;
     }
-    if (!abstract.trim()) {
-      setError('Abstract is required');
-      return;
-    }
-    if (!motivation.trim()) {
-      setError('Motivation is required');
-      return;
-    }
-    if (!rationale.trim()) {
-      setError('Rationale is required');
+    if (!rationaleStatement.trim()) {
+      setError('Rationale statement is required');
       return;
     }
     setError('');
@@ -307,11 +344,13 @@ export default function VoteNowPage() {
     setDrepId('');
     setSelectedProposal(null);
     setVoteChoice(null);
-    setAuthorName('');
-    setTitle('');
-    setAbstract('');
-    setMotivation('');
-    setRationale('');
+   // setAuthorName('');
+    setSummary('');
+    setRationaleStatement('');
+    setPrecedentDiscussion('');
+    setCounterargumentDiscussion('');
+    setConclusion('');
+    setReferences([]);
     setIpfsApiKey('');
     setRationaleUrl('');
     setRationaleHash('');
@@ -649,19 +688,19 @@ export default function VoteNowPage() {
         </Card>
       )}
 
-      {/* Step 4: Vote Rationale (CIP-108) */}
+      {/* Step 4: Vote Rationale (CIP-136) */}
       {step === 'rationale' && (
         <Card>
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-display font-bold mb-2">Vote Rationale</h2>
               <p className="text-sm text-muted-foreground">
-                Explain your reasoning following the CIP-108 standard. All fields are required.
+                Explain your reasoning following the CIP-136 standard. Required fields are marked with *.
               </p>
             </div>
 
             <div className="space-y-4">
-              {/* Author Name */}
+              {/* Author Name
               <div>
                 <label htmlFor="author-name" className="block text-sm font-medium mb-2">
                   Author Name *
@@ -674,67 +713,156 @@ export default function VoteNowPage() {
                   placeholder="Your name or username"
                   className="w-full px-4 py-2 border border-input rounded-md bg-background"
                 />
-              </div>
+              </div> */}
 
-              {/* Title */}
+              {/* Summary */}
               <div>
-                <label htmlFor="title" className="block text-sm font-medium mb-2">
-                  Title * <span className="text-muted-foreground">({title.length}/{MAX_CHAR_LIMITS.title})</span>
-                </label>
-                <input
-                  id="title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value.slice(0, MAX_CHAR_LIMITS.title))}
-                  placeholder="Brief summary of your position"
-                  className="w-full px-4 py-2 border border-input rounded-md bg-background"
-                  maxLength={MAX_CHAR_LIMITS.title}
-                />
-              </div>
-
-              {/* Abstract */}
-              <div>
-                <label htmlFor="abstract" className="block text-sm font-medium mb-2">
-                  Abstract * <span className="text-muted-foreground">({abstract.length}/{MAX_CHAR_LIMITS.abstract})</span>
+                <label htmlFor="summary" className="block text-sm font-medium mb-2">
+                  Summary * <span className="text-muted-foreground">({summary.length}/{MAX_CHAR_LIMITS.summary})</span>
                 </label>
                 <textarea
-                  id="abstract"
-                  value={abstract}
-                  onChange={(e) => setAbstract(e.target.value.slice(0, MAX_CHAR_LIMITS.abstract))}
-                  placeholder="Concise summary of your motivation and rationale"
+                  id="summary"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value.slice(0, MAX_CHAR_LIMITS.summary))}
+                  placeholder="A clear and concise statement of your position (max 300 characters)"
                   className="w-full px-4 py-2 border border-input rounded-md bg-background min-h-[80px]"
-                  maxLength={MAX_CHAR_LIMITS.abstract}
+                  maxLength={MAX_CHAR_LIMITS.summary}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Clearly state your stance and give a brief overview of your main arguments
+                </p>
               </div>
 
-              {/* Motivation */}
+              {/* Rationale Statement */}
               <div>
-                <label htmlFor="motivation" className="block text-sm font-medium mb-2">
-                  Motivation * <span className="text-muted-foreground">({motivation.length}/{MAX_CHAR_LIMITS.motivation})</span>
+                <label htmlFor="rationale-statement" className="block text-sm font-medium mb-2">
+                  Rationale Statement * <span className="text-muted-foreground">({rationaleStatement.length}/{MAX_CHAR_LIMITS.rationaleStatement})</span>
                 </label>
                 <textarea
-                  id="motivation"
-                  value={motivation}
-                  onChange={(e) => setMotivation(e.target.value.slice(0, MAX_CHAR_LIMITS.motivation))}
-                  placeholder="Context and background for your vote"
-                  className="w-full px-4 py-2 border border-input rounded-md bg-background min-h-[100px]"
-                  maxLength={MAX_CHAR_LIMITS.motivation}
+                  id="rationale-statement"
+                  value={rationaleStatement}
+                  onChange={(e) => setRationaleStatement(e.target.value.slice(0, MAX_CHAR_LIMITS.rationaleStatement))}
+                  placeholder="Fully describe your rationale and discuss your arguments in detail (markdown supported)"
+                  className="w-full px-4 py-2 border border-input rounded-md bg-background min-h-[200px]"
+                  maxLength={MAX_CHAR_LIMITS.rationaleStatement}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This is the core of your rationale. Discuss your arguments in full detail.
+                </p>
               </div>
 
-              {/* Rationale */}
+              {/* Precedent Discussion (Optional) */}
               <div>
-                <label htmlFor="rationale" className="block text-sm font-medium mb-2">
-                  Rationale * <span className="text-muted-foreground">({rationale.length}/{MAX_CHAR_LIMITS.rationale})</span>
+                <label htmlFor="precedent-discussion" className="block text-sm font-medium mb-2">
+                  Precedent Discussion <span className="text-muted-foreground">(Optional, {precedentDiscussion.length}/{MAX_CHAR_LIMITS.precedentDiscussion})</span>
                 </label>
                 <textarea
-                  id="rationale"
-                  value={rationale}
-                  onChange={(e) => setRationale(e.target.value.slice(0, MAX_CHAR_LIMITS.rationale))}
-                  placeholder="Detailed explanation of your reasoning"
+                  id="precedent-discussion"
+                  value={precedentDiscussion}
+                  onChange={(e) => setPrecedentDiscussion(e.target.value.slice(0, MAX_CHAR_LIMITS.precedentDiscussion))}
+                  placeholder="Discuss relevant precedent (markdown supported)"
                   className="w-full px-4 py-2 border border-input rounded-md bg-background min-h-[120px]"
-                  maxLength={MAX_CHAR_LIMITS.rationale}
+                  maxLength={MAX_CHAR_LIMITS.precedentDiscussion}
                 />
+              </div>
+
+              {/* Counterargument Discussion (Optional) */}
+              <div>
+                <label htmlFor="counterargument-discussion" className="block text-sm font-medium mb-2">
+                  Counterargument Discussion <span className="text-muted-foreground">(Optional, {counterargumentDiscussion.length}/{MAX_CHAR_LIMITS.counterargumentDiscussion})</span>
+                </label>
+                <textarea
+                  id="counterargument-discussion"
+                  value={counterargumentDiscussion}
+                  onChange={(e) => setCounterargumentDiscussion(e.target.value.slice(0, MAX_CHAR_LIMITS.counterargumentDiscussion))}
+                  placeholder="Discuss significant counter-arguments to your position (markdown supported)"
+                  className="w-full px-4 py-2 border border-input rounded-md bg-background min-h-[120px]"
+                  maxLength={MAX_CHAR_LIMITS.counterargumentDiscussion}
+                />
+              </div>
+
+              {/* Conclusion (Optional) */}
+              <div>
+                <label htmlFor="conclusion" className="block text-sm font-medium mb-2">
+                  Conclusion <span className="text-muted-foreground">(Optional, {conclusion.length}/{MAX_CHAR_LIMITS.conclusion})</span>
+                </label>
+                <textarea
+                  id="conclusion"
+                  value={conclusion}
+                  onChange={(e) => setConclusion(e.target.value.slice(0, MAX_CHAR_LIMITS.conclusion))}
+                  placeholder="Conclude your rationale"
+                  className="w-full px-4 py-2 border border-input rounded-md bg-background min-h-[80px]"
+                  maxLength={MAX_CHAR_LIMITS.conclusion}
+                />
+              </div>
+
+              {/* References (Optional) */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  References <span className="text-muted-foreground">(Optional)</span>
+                </label>
+                <div className="space-y-3">
+                  {references.map((ref, index) => (
+                    <div key={index} className="p-3 border border-input rounded-md bg-muted/30">
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="flex gap-2">
+                          <select
+                            value={ref.type}
+                            onChange={(e) => {
+                              const newRefs = [...references];
+                              newRefs[index].type = e.target.value as 'GovernanceMetadata' | 'Other' | 'RelevantArticles';
+                              setReferences(newRefs);
+                            }}
+                            className="px-2 py-1 border border-input rounded-md bg-background text-sm"
+                          >
+                            <option value="RelevantArticles">Relevant Articles</option>
+                            <option value="GovernanceMetadata">Governance Metadata</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          <button
+                            onClick={() => setReferences(references.filter((_, i) => i !== index))}
+                            className="px-2 py-1 text-sm text-red-600 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={ref.label}
+                          onChange={(e) => {
+                            const newRefs = [...references];
+                            newRefs[index].label = e.target.value;
+                            setReferences(newRefs);
+                          }}
+                          placeholder="Reference label (e.g., 'Article III section 8')"
+                          className="w-full px-3 py-1.5 border border-input rounded-md bg-background text-sm"
+                        />
+                        <input
+                          type="url"
+                          value={ref.uri}
+                          onChange={(e) => {
+                            const newRefs = [...references];
+                            newRefs[index].uri = e.target.value;
+                            setReferences(newRefs);
+                          }}
+                          placeholder="URL (e.g., 'https://...')"
+                          className="w-full px-3 py-1.5 border border-input rounded-md bg-background text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReferences([...references, { type: 'Other', label: '', uri: '' }])}
+                    className="w-full"
+                  >
+                    + Add Reference
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add links to relevant constitution articles, governance metadata, or other supporting resources
+                </p>
               </div>
             </div>
 
@@ -763,7 +891,7 @@ export default function VoteNowPage() {
             <div>
               <h2 className="text-2xl font-display font-bold mb-2">IPFS Storage Configuration</h2>
               <p className="text-sm text-muted-foreground">
-                Upload your vote rationale to IPFS for permanent, decentralized storage.
+                Upload your CIP-136 compliant vote rationale to IPFS for permanent, decentralized storage.
               </p>
             </div>
 
@@ -902,7 +1030,7 @@ export default function VoteNowPage() {
 
                 <div>
                   <span className="text-sm font-medium">Rationale:</span>
-                  <p className="text-sm mt-1">{title}</p>
+                  <p className="text-sm mt-1">{summary}</p>
                   <p className="font-mono text-xs text-muted-foreground mt-1 break-all">
                     {rationaleUrl}
                   </p>

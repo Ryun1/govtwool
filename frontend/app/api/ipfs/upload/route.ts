@@ -26,9 +26,9 @@ export async function POST(request: NextRequest) {
     });
 
     // Validate metadata has required fields
-    // Support both DRep metadata (CIP-119) and Vote rationale (CIP-108)
+    // Support both DRep metadata (CIP-119) and Vote rationale (CIP-136)
     const isDRepMetadata = metadata.body?.givenName;
-    const isVoteRationale = metadata.body?.title && metadata.body?.rationale;
+    const isVoteRationale = metadata.body?.summary && metadata.body?.rationaleStatement;
     
     if (!metadata || typeof metadata !== 'object') {
       console.error('❌ [IPFS API] Invalid metadata structure');
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (!isDRepMetadata && !isVoteRationale) {
       console.error('❌ [IPFS API] Invalid metadata structure');
       return NextResponse.json(
-        { error: 'Invalid metadata: must be either DRep metadata (CIP-119) or Vote rationale (CIP-108)' },
+        { error: 'Invalid metadata: must be either DRep metadata (CIP-119) or Vote rationale (CIP-136)' },
         { status: 400 }
       );
     }
