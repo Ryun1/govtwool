@@ -3,13 +3,13 @@ import type { ConnectedWallet } from '@/lib/api/mesh';
 import type { DRep } from '@/types/governance';
 
 type WalletWithGovernance = {
-  getDRep?: () => Promise<{ dRepIDCip105?: string } | null>;
+  getDRep: () => Promise<{ dRepIDCip105?: string } | null>;
 };
 
 const hasGetDRep = (wallet: unknown): wallet is WalletWithGovernance =>
   typeof wallet === 'object' &&
   wallet !== null &&
-  typeof (wallet as WalletWithGovernance).getDRep === 'function';
+  typeof (wallet as Partial<WalletWithGovernance>).getDRep === 'function';
 
 type BrowserWalletWithCip95 = BrowserWallet & {
   cip95?: unknown;
