@@ -57,3 +57,20 @@ pub async fn get_action_votes(
         }
     }
 }
+
+pub async fn get_action_participation(
+    State(router): State<CachedProviderRouter>,
+    Path(id): Path<String>,
+) -> Result<Json<ActionVoterParticipation>, StatusCode> {
+    match router.get_action_voter_participation(&id).await {
+        Ok(result) => Ok(Json(result)),
+        Err(error) => {
+            tracing::error!("Error fetching action participation {}: {}", id, error);
+            if error.to_string().contains("not found") {
+                Err(StatusCode::NOT_FOUND)
+            } else {
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+}

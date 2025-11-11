@@ -218,6 +218,181 @@ impl KoiosProvider {
             metadata: (!proposal["meta_json"].is_null()).then(|| proposal["meta_json"].clone()),
         })
     }
+
+    fn map_committee_member(member: &Value) -> Option<CommitteeMemberInfo> {
+        let identifier = member
+            .get("committee_member")
+            .and_then(|v| v.as_str())
+            .or_else(|| member.get("committee_id").and_then(|v| v.as_str()))
+            .or_else(|| member.get("credential").and_then(|v| v.as_str()))
+            .or_else(|| member.get("cold_vkey").and_then(|v| v.as_str()))
+            .or_else(|| member.get("cold_key").and_then(|v| v.as_str()))?;
+
+        let role = member
+            .get("role")
+            .and_then(|v| v.as_str())
+            .or_else(|| member.get("status").and_then(|v| v.as_str()));
+
+        let hot_key = member
+            .get("hot_vkey")
+            .and_then(|v| v.as_str())
+            .or_else(|| member.get("hot_key").and_then(|v| v.as_str()))
+            .map(|s| s.to_string());
+
+        let cold_key = member
+            .get("cold_vkey")
+            .and_then(|v| v.as_str())
+            .or_else(|| member.get("cold_key").and_then(|v| v.as_str()))
+            .map(|s| s.to_string());
+
+        let expiry_epoch = member
+            .get("expiry_epoch")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                member
+                    .get("expiry_epoch")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
+            .map(|v| v as u32);
+
+        Some(CommitteeMemberInfo {
+            identifier: identifier.to_string(),
+            role: role.map(|s| s.to_string()),
+            hot_key,
+            cold_key,
+            expiry_epoch,
+        })
+    }
+
+    fn map_vote_record(vote: &Value) -> Option<ActionVoteRecord> {
+        let voter_type = vote
+            .get("voter_role")
+            .and_then(|v| v.as_str())
+            .or_else(|| vote.get("voter_type").and_then(|v| v.as_str()))
+            .or_else(|| vote.get("role").and_then(|v| v.as_str()))
+            .unwrap_or("")
+            .to_ascii_lowercase();
+
+        if voter_type.is_empty() {
+            return None;
+        }
+
+        let voter_identifier = vote
+            .get("voter")
+            .and_then(|v| v.as_str())
+            .or_else(|| vote.get("voter_id").and_then(|v| v.as_str()))
+            .or_else(|| vote.get("drep_id").and_then(|v| v.as_str()))
+            .or_else(|| vote.get("pool_id").and_then(|v| v.as_str()))
+            .or_else(|| vote.get("committee_id").and_then(|v| v.as_str()))
+            .or_else(|| vote.get("credential").and_then(|v| v.as_str()))
+            .unwrap_or("")
+            .to_string();
+
+        if voter_identifier.is_empty() {
+            return None;
+        }
+
+        let vote_choice = vote
+            .get("vote")
+            .and_then(|value| value.as_str())
+            .and_then(VoteChoice::from_str);
+
+        let voting_power = vote
+            .get("voting_power")
+            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .or_else(|| vote.get("power").and_then(|v| v.as_str().map(|s| s.to_string())))
+            .or_else(|| {
+                vote.get("voting_power")
+                    .and_then(|v| v.as_u64().map(|u| u.to_string()))
+            });
+
+        let tx_hash = vote
+            .get("vote_tx_hash")
+            .and_then(|v| v.as_str())
+            .or_else(|| vote.get("tx_hash").and_then(|v| v.as_str()))
+            .map(|s| s.to_string());
+
+        let cert_index = vote
+            .get("proposal_index")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                vote.get("proposal_index")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
+            .map(|v| v as u32);
+
+        let block_time = vote
+            .get("block_time")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                vote.get("block_time")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+            });
+
+        Some(ActionVoteRecord {
+            voter_identifier,
+            voter_type,
+            vote: vote_choice,
+            voting_power,
+            tx_hash,
+            cert_index,
+            block_time,
+        })
+    }
+
+    pub async fn get_committee_info(&self) -> Result<Vec<CommitteeMemberInfo>, anyhow::Error> {
+        let json = self.fetch("/committee_info", "GET", None).await?;
+        let mut members: Vec<CommitteeMemberInfo> = Vec::new();
+
+        if let Some(Value::Array(entries)) = json {
+            for entry in entries {
+                if let Some(current) = entry.get("committee").and_then(|v| v.as_array()) {
+                    for member in current {
+                        if let Some(mapped) = Self::map_committee_member(member) {
+                            members.push(mapped);
+                        }
+                    }
+                }
+
+                if let Some(future) = entry
+                    .get("future_committee")
+                    .or_else(|| entry.get("next_committee"))
+                    .and_then(|v| v.as_array())
+                {
+                    for member in future {
+                        if let Some(mapped) = Self::map_committee_member(member) {
+                            members.push(mapped);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(members)
+    }
+
+    pub async fn get_action_vote_records(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<ActionVoteRecord>, anyhow::Error> {
+        let endpoint = format!("/proposal_votes?_proposal_id={}", proposal_id);
+        let json = self.fetch(&endpoint, "GET", None).await?;
+
+        let mut records = Vec::new();
+
+        if let Some(Value::Array(arr)) = json {
+            for vote in arr {
+                if let Some(record) = Self::map_vote_record(&vote) {
+                    records.push(record);
+                }
+            }
+        }
+
+        Ok(records)
+    }
 }
 
 #[async_trait]

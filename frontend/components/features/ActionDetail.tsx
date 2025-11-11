@@ -11,14 +11,20 @@ import { VotingProgress } from '../charts/VotingProgress';
 import { ProposalMetadata } from './ProposalMetadata';
 import { MetadataValidationSummary } from './MetadataValidationSummary';
 import { ProposalTimeline } from './ProposalTimeline';
-import { Clock, Calendar, Hash, ExternalLink, DollarSign, Settings, Vote } from 'lucide-react';
-import type { GovernanceAction, ActionVotingBreakdown } from '@/types/governance';
+import { Clock, Calendar, Hash, ExternalLink, DollarSign, Settings } from 'lucide-react';
+import type {
+  GovernanceAction,
+  ActionVotingBreakdown,
+  ActionVoterParticipation,
+} from '@/types/governance';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { getActionDisplayType, getActionTitle } from '@/lib/governance';
+import { VoterParticipationView } from './VoterParticipation';
 
 interface ActionDetailProps {
   action: GovernanceAction;
   votingResults: ActionVotingBreakdown;
+  participation: ActionVoterParticipation | null;
 }
 
 function formatActionType(type: string): string {
@@ -141,7 +147,11 @@ function getExplorerUrl(txHash: string): string {
   return `https://preview.cardanoscan.io/transaction/${txHash}`;
 }
 
-export default function ActionDetail({ action, votingResults }: ActionDetailProps) {
+export default function ActionDetail({
+  action,
+  votingResults,
+  participation,
+}: ActionDetailProps) {
   const router = useRouter();
   const status = action.status || 'submitted';
   const title = getActionTitle(action);
@@ -567,12 +577,25 @@ export default function ActionDetail({ action, votingResults }: ActionDetailProp
                 <TabsList className="mt-4">
                   <TabsTrigger value="breakdown">By Voter Type</TabsTrigger>
                   <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                  <TabsTrigger value="participation" disabled={!participation}>
+                    Voter Participation
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="breakdown" className="mt-6">
                   <VotingChart data={chartData} />
                 </TabsContent>
                 <TabsContent value="timeline" className="mt-6">
                   <VotingTimelineChart timeline={votingResults.vote_timeline} />
+                </TabsContent>
+                <TabsContent value="participation" className="mt-6">
+                  {participation ? (
+                    <VoterParticipationView participation={participation} />
+                  ) : (
+                    <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-6 text-sm text-muted-foreground">
+                      Detailed participation data is currently unavailable for this action. Try
+                      again later once network providers publish full voter information.
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>

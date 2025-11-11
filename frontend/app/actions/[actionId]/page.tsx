@@ -1,4 +1,8 @@
-import { getGovernanceAction, getActionVotingResults } from '@/lib/governance';
+import {
+  getGovernanceAction,
+  getActionVotingResults,
+  getActionVoterParticipation,
+} from '@/lib/governance';
 import ActionDetail from '@/components/features/ActionDetail';
 import { notFound } from 'next/navigation';
 
@@ -12,11 +16,18 @@ export default async function ActionDetailPage({ params }: PageProps) {
   const { actionId } = await params;
   const action = await getGovernanceAction(actionId);
   const votingResults = await getActionVotingResults(actionId);
+  const participation = await getActionVoterParticipation(actionId);
 
   if (!action) {
     notFound();
   }
 
-  return <ActionDetail action={action} votingResults={votingResults} />;
+  return (
+    <ActionDetail
+      action={action}
+      votingResults={votingResults}
+      participation={participation}
+    />
+  );
 }
 

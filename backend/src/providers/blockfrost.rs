@@ -195,6 +195,168 @@ impl BlockfrostProvider {
         })
     }
 
+    fn map_stake_pool(&self, pool: &Value) -> Option<StakePool> {
+        let pool_id = pool["pool_id"].as_str().or_else(|| pool["id"].as_str())?;
+        Some(StakePool {
+            pool_id: pool_id.to_string(),
+            hex: pool["hex"].as_str().map(|s| s.to_string()),
+            ticker: pool["ticker"].as_str().map(|s| s.to_string()),
+            name: pool["name"].as_str().map(|s| s.to_string()),
+            description: pool["description"].as_str().map(|s| s.to_string()),
+            homepage: pool["homepage"].as_str().map(|s| s.to_string()),
+            retiring_epoch: pool["retiring_epoch"]
+                .as_u64()
+                .map(|value| value as u32)
+                .or_else(|| {
+                    pool["retiring_epoch"]
+                        .as_str()
+                        .and_then(|s| s.parse::<u32>().ok())
+                }),
+        })
+    }
+
+    fn extract_string(value: &Value, keys: &[&str]) -> Option<String> {
+        for key in keys {
+            if let Some(v) = value.get(*key) {
+                if let Some(s) = v.as_str() {
+                    if !s.is_empty() {
+                        return Some(s.to_string());
+                    }
+                } else if let Some(num) = v.as_u64() {
+                    return Some(num.to_string());
+                }
+            }
+        }
+        None
+    }
+
+    fn map_vote_record(&self, vote: &Value) -> Option<ActionVoteRecord> {
+        let voter_type = Self::extract_string(
+            vote,
+            &["voter_role", "voter_type", "role", "kind", "voter_kind"],
+        )?;
+
+        let voter_identifier = Self::extract_string(
+            vote,
+            &[
+                "voter",
+                "voter_id",
+                "drep_id",
+                "pool_id",
+                "committee_id",
+                "credential",
+                "hot_key",
+                "cold_key",
+            ],
+        )
+        .unwrap_or_else(|| "".to_string());
+
+        if voter_identifier.is_empty() {
+            return None;
+        }
+
+        let vote_choice = vote["vote"]
+            .as_str()
+            .and_then(|value| VoteChoice::from_str(value));
+
+        let voting_power = Self::extract_string(vote, &["voting_power", "power", "weight"]);
+
+        let tx_hash = Self::extract_string(vote, &["tx_hash", "transaction_hash"]);
+
+        let cert_index = vote["cert_index"]
+            .as_u64()
+            .or_else(|| {
+                vote["certificate_index"]
+                    .as_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
+            .map(|value| value as u32);
+
+        let block_time = vote["block_time"]
+            .as_u64()
+            .or_else(|| {
+                vote["block_time"]
+                    .as_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+            });
+
+        Some(ActionVoteRecord {
+            voter_identifier,
+            voter_type: voter_type.to_ascii_lowercase(),
+            vote: vote_choice,
+            voting_power,
+            tx_hash,
+            cert_index,
+            block_time,
+        })
+    }
+
+    pub async fn get_stake_pools_page(
+        &self,
+        page: u32,
+        count: u32,
+    ) -> Result<StakePoolPage, anyhow::Error> {
+        let path = format!("/pools/extended?page={}&count={}", page, count);
+        let json = self.fetch(&path).await?;
+
+        let pools = if let Some(Value::Array(arr)) = json {
+            arr.iter()
+                .filter_map(|pool| self.map_stake_pool(pool))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let has_more = pools.len() == count as usize;
+
+        Ok(StakePoolPage {
+            pools,
+            has_more,
+            total: None,
+        })
+    }
+
+    pub async fn get_action_vote_records(
+        &self,
+        tx_hash: &str,
+        cert_index: u32,
+    ) -> Result<Vec<ActionVoteRecord>, anyhow::Error> {
+        let mut records = Vec::new();
+        let mut page = 1u32;
+
+        loop {
+            let path = format!(
+                "/governance/proposals/{}/{}/votes?page={}&count=100",
+                tx_hash, cert_index, page
+            );
+            let json = self.fetch(&path).await?;
+
+            let Some(Value::Array(arr)) = json else {
+                break;
+            };
+
+            if arr.is_empty() {
+                break;
+            }
+
+            let mut batch_count = 0usize;
+            for vote in arr {
+                if let Some(record) = self.map_vote_record(&vote) {
+                    records.push(record);
+                    batch_count += 1;
+                }
+            }
+
+            if batch_count < 100 {
+                break;
+            }
+
+            page = page.saturating_add(1);
+        }
+
+        Ok(records)
+    }
+
     pub async fn get_epoch_start_time(&self, epoch: u32) -> Result<Option<u64>, anyhow::Error> {
         let path = format!("/epochs/{}", epoch);
         let json = self.fetch(&path).await?;

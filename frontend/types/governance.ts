@@ -269,3 +269,65 @@ export interface ProposalVotingSummary {
   committee_abstain_votes_cast?: number;
 }
 
+export type VoteChoice = 'yes' | 'no' | 'abstain';
+
+export interface ParticipationSummary {
+  total_eligible: number;
+  total_voted: number;
+  total_missing: number;
+  turnout_percentage?: number;
+}
+
+export interface ParticipationGroup<TParticipant> {
+  summary: ParticipationSummary;
+  participants: TParticipant[];
+}
+
+export interface DRepParticipation {
+  drep_id: string;
+  given_name?: string;
+  view?: string;
+  hex?: string;
+  has_profile?: boolean;
+  has_voted: boolean;
+  vote?: VoteChoice;
+  voting_power?: string;
+  tx_hash?: string;
+  cert_index?: number;
+  block_time?: number;
+}
+
+export interface StakePoolParticipation {
+  pool_id: string;
+  ticker?: string;
+  name?: string;
+  description?: string;
+  homepage?: string;
+  has_voted: boolean;
+  vote?: VoteChoice;
+  voting_power?: string;
+  tx_hash?: string;
+  cert_index?: number;
+  block_time?: number;
+}
+
+export interface CommitteeParticipation {
+  identifier: string;
+  role?: string;
+  hot_key?: string;
+  cold_key?: string;
+  expiry_epoch?: number;
+  has_voted: boolean;
+  vote?: VoteChoice;
+  voting_power?: string;
+  tx_hash?: string;
+  cert_index?: number;
+  block_time?: number;
+}
+
+export interface ActionVoterParticipation {
+  dreps: ParticipationGroup<DRepParticipation>;
+  stake_pools: ParticipationGroup<StakePoolParticipation>;
+  committee: ParticipationGroup<CommitteeParticipation>;
+}
+

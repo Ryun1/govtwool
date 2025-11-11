@@ -24,7 +24,8 @@ which are not widely present in current governance tooling offerings.
   - hash checks
   - warning if author not using ipfs
   - author witness validation
-  - CIP-???? | On-chain effects implementation
+  - CIP-0169 | On-chain effects implementation
+- voter participation tab with export
 
 #### DRep Directory
 
