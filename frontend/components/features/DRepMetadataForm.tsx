@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ChangeEvent } from 'react';
+import { useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Upload, Link as LinkIcon, FileJson, X, Plus } from 'lucide-react';
@@ -92,7 +92,6 @@ export default function DRepMetadataForm({
   const [customUrl, setCustomUrl] = useState('');
   const [customHash, setCustomHash] = useState('');
   const [uploadError, setUploadError] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
 
   const handleAddReference = () => {
     setReferences([...references, { type: 'Link', label: '', uri: '' }]);
@@ -165,35 +164,7 @@ export default function DRepMetadataForm({
     setStep('storage');
   };
 
-  const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const content = e.target?.result as string;
-        const json = JSON.parse(content);
-        
-        // Validate it has required fields
-        if (!json.body?.givenName) {
-          setUploadError('Invalid metadata: givenName is required');
-          return;
-        }
-
-        // Upload to IPFS (if IPFS option is selected)
-        if (storageOption === 'ipfs') {
-          await uploadToIpfs(json);
-        }
-      } catch (error) {
-        setUploadError('Invalid JSON file');
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const uploadToIpfs = async (metadata: DRepMetadata) => {
-    setIsUploading(true);
     setUploadError('');
     setStep('uploading');
 
@@ -228,8 +199,6 @@ export default function DRepMetadataForm({
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Failed to upload to IPFS');
       setStep('storage');
-    } finally {
-      setIsUploading(false);
     }
   };
 

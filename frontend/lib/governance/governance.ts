@@ -8,6 +8,7 @@ import type {
   VoteCounts,
   ProposalVotingSummary,
   VoteTimelinePoint,
+  ActionVoterParticipation,
 } from '@/types/governance';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -582,5 +583,37 @@ export async function getActionVotingResults(actionId: string): Promise<ActionVo
     }
     console.error('Error fetching voting results:', error);
     return fallback;
+  }
+}
+
+export async function getActionVoterParticipation(
+  actionId: string
+): Promise<ActionVoterParticipation | null> {
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(
+      `${baseUrl}/api/actions/${encodeURIComponent(actionId)}/participation`,
+      {
+        next: { revalidate: 60 },
+      }
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`API responded with status ${response.status}`);
+    }
+
+    const participation: unknown = await response.json();
+    if (!participation) {
+      return null;
+    }
+
+    return participation as ActionVoterParticipation;
+  } catch (error) {
+    console.error('Error fetching action participation:', error);
+    return null;
   }
 }

@@ -206,6 +206,58 @@ impl ProviderRouter {
         self.blockfrost.get_stake_delegation(stake_address).await
     }
 
+    pub async fn get_stake_pools_page(
+        &self,
+        page: u32,
+        count: u32,
+    ) -> Result<StakePoolPage, anyhow::Error> {
+        self.blockfrost.get_stake_pools_page(page, count).await
+    }
+
+    pub async fn get_committee_members(&self) -> Result<Vec<CommitteeMemberInfo>, anyhow::Error> {
+        self.koios.get_committee_info().await
+    }
+
+    pub async fn get_action_vote_records(
+        &self,
+        action: &GovernanceAction,
+    ) -> Result<Vec<ActionVoteRecord>, anyhow::Error> {
+        if let Some(cert_index) = action.cert_index {
+            match self
+                .blockfrost
+                .get_action_vote_records(&action.tx_hash, cert_index)
+                .await
+            {
+                Ok(records) if !records.is_empty() => return Ok(records),
+                Ok(_) => {}
+                Err(error) => {
+                    tracing::debug!(
+                        "Blockfrost vote records failed for {}: {}",
+                        action.action_id,
+                        error
+                    );
+                }
+            }
+        }
+
+        let proposal_id = action
+            .proposal_id
+            .as_deref()
+            .unwrap_or_else(|| action.action_id.as_str());
+
+        match self.koios.get_action_vote_records(proposal_id).await {
+            Ok(records) => Ok(records),
+            Err(error) => {
+                tracing::debug!(
+                    "Koios vote records failed for {}: {}",
+                    action.action_id,
+                    error
+                );
+                Ok(Vec::new())
+            }
+        }
+    }
+
     pub async fn health_check(&self) -> Result<bool, anyhow::Error> {
         let blockfrost_ok = self.blockfrost.health_check().await.unwrap_or(false);
         let koios_ok = self.koios.health_check().await.unwrap_or(false);

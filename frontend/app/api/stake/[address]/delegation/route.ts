@@ -56,7 +56,7 @@ export async function GET(
         rewards_available: null,
       });
     } else {
-      const errorText = await response.text();
+      await response.text();
       return NextResponse.json(
         { 
           error: 'Failed to query delegation from backend',

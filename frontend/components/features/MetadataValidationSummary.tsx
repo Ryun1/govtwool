@@ -65,9 +65,6 @@ export function MetadataValidationSummary({ checks, metaUrl }: MetadataValidatio
     return null;
   }
 
-  const authorStatus = checks.author_witness?.status ?? 'unknown';
-  const showVerifierFootnote = ['pass', 'fail', 'warning'].includes(authorStatus);
-
   return (
     <Card className="border-dashed border-field-green/40">
       <CardHeader>

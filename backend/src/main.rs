@@ -94,6 +94,10 @@ async fn main() -> Result<(), anyhow::Error> {
             get(api::actions::get_action_votes),
         )
         .route(
+            "/api/actions/:id/participation",
+            get(api::actions::get_action_participation),
+        )
+        .route(
             "/api/stake/:stake_address/delegation",
             get(api::stake::get_stake_delegation),
         )

@@ -8,7 +8,7 @@ interface SheepIconProps extends React.SVGProps<SVGSVGElement> {
   priority?: boolean;
 }
 
-export function SheepIcon({ size = 40, title, className, priority: _priority, ...rest }: SheepIconProps) {
+export function SheepIcon({ size = 40, title, className, ...rest }: SheepIconProps) {
   return (
     <svg
       width={size}

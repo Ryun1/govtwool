@@ -352,6 +352,396 @@ impl CachedProviderRouter {
         Ok(result)
     }
 
+    pub async fn get_action_voter_participation(
+        &self,
+        id: &str,
+    ) -> Result<ActionVoterParticipation, anyhow::Error> {
+        let cache_key = CacheKey::ActionParticipation {
+            id: id.to_string(),
+        };
+
+        if let Some(cached) = self
+            .cache
+            .get::<ActionVoterParticipation>(&cache_key)
+            .await
+        {
+            debug!("Cache hit for action participation {}", id);
+            return Ok(cached);
+        }
+
+        let action = match self.get_governance_action(id).await? {
+            Some(action) => action,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "Governance action {} not found for participation lookup",
+                    id
+                ))
+            }
+        };
+
+        let vote_records = self.router.get_action_vote_records(&action).await?;
+
+        let mut drep_page = 1u32;
+        let mut drep_participants: Vec<DRepParticipation> = Vec::new();
+        let mut drep_lookup: HashMap<String, usize> = HashMap::new();
+        const MAX_DREP_PAGES: u32 = 50;
+        const PAGE_SIZE: u32 = 100;
+
+        while drep_page <= MAX_DREP_PAGES {
+            let query = DRepsQuery {
+                page: drep_page,
+                count: PAGE_SIZE,
+                statuses: Vec::new(),
+                search: None,
+                sort: None,
+                direction: None,
+                enrich: false,
+            }
+            .with_defaults();
+
+            let page_result = self.get_dreps_page(&query).await?;
+            if page_result.dreps.is_empty() {
+                break;
+            }
+
+            for drep in page_result.dreps {
+                let index = drep_participants.len();
+
+                let participant = DRepParticipation {
+                    drep_id: drep.drep_id.clone(),
+                    given_name: drep.given_name.clone(),
+                    view: drep.view.clone(),
+                    hex: drep.hex.clone(),
+                    has_profile: drep.has_profile,
+                    has_voted: false,
+                    vote: None,
+                    voting_power: None,
+                    tx_hash: None,
+                    cert_index: None,
+                    block_time: None,
+                };
+
+                let mut insert_keys = Vec::new();
+                insert_keys.push(drep.drep_id.to_ascii_lowercase());
+                if let Some(view) = &drep.view {
+                    insert_keys.push(view.to_ascii_lowercase());
+                }
+                if let Some(hex) = &drep.hex {
+                    insert_keys.push(hex.to_ascii_lowercase());
+                }
+                if let Some(hash) = &drep.drep_hash {
+                    insert_keys.push(hash.to_ascii_lowercase());
+                }
+                if let Ok(converted_hex) = decode_drep_id_to_hex(&drep.drep_id) {
+                    insert_keys.push(converted_hex.to_ascii_lowercase());
+                }
+
+                drep_participants.push(participant);
+                for key in insert_keys {
+                    drep_lookup.insert(key, index);
+                }
+            }
+
+            if !page_result.has_more {
+                break;
+            }
+            drep_page = drep_page.saturating_add(1);
+        }
+
+        let mut pool_page = 1u32;
+        let mut stake_pool_participants: Vec<StakePoolParticipation> = Vec::new();
+        let mut pool_lookup: HashMap<String, usize> = HashMap::new();
+        const MAX_POOL_PAGES: u32 = 80;
+
+        while pool_page <= MAX_POOL_PAGES {
+            let pools_page = match self
+                .router
+                .get_stake_pools_page(pool_page, PAGE_SIZE)
+                .await
+            {
+                Ok(page) => page,
+                Err(error) => {
+                    tracing::debug!(
+                        "Failed to fetch stake pool page {} for participation: {}",
+                        pool_page,
+                        error
+                    );
+                    break;
+                }
+            };
+
+            if pools_page.pools.is_empty() {
+                break;
+            }
+
+            for pool in pools_page.pools {
+                let index = stake_pool_participants.len();
+                let participant = StakePoolParticipation {
+                    pool_id: pool.pool_id.clone(),
+                    ticker: pool.ticker.clone(),
+                    name: pool.name.clone(),
+                    description: pool.description.clone(),
+                    homepage: pool.homepage.clone(),
+                    has_voted: false,
+                    vote: None,
+                    voting_power: None,
+                    tx_hash: None,
+                    cert_index: None,
+                    block_time: None,
+                };
+
+                stake_pool_participants.push(participant);
+                pool_lookup.insert(pool.pool_id.to_ascii_lowercase(), index);
+                if let Some(hex) = pool.hex {
+                    pool_lookup.insert(hex.to_ascii_lowercase(), index);
+                }
+            }
+
+            if !pools_page.has_more {
+                break;
+            }
+
+            pool_page = pool_page.saturating_add(1);
+        }
+
+        let committee_members = self
+            .router
+            .get_committee_members()
+            .await
+            .unwrap_or_default();
+
+        let mut committee_participants: Vec<CommitteeParticipation> = Vec::new();
+        let mut committee_lookup: HashMap<String, usize> = HashMap::new();
+
+        for member in committee_members {
+            let index = committee_participants.len();
+            let participant = CommitteeParticipation {
+                identifier: member.identifier.clone(),
+                role: member.role.clone(),
+                hot_key: member.hot_key.clone(),
+                cold_key: member.cold_key.clone(),
+                expiry_epoch: member.expiry_epoch,
+                has_voted: false,
+                vote: None,
+                voting_power: None,
+                tx_hash: None,
+                cert_index: None,
+                block_time: None,
+            };
+
+            let mut keys = Vec::new();
+            keys.push(member.identifier.to_ascii_lowercase());
+            if let Some(hot) = member.hot_key {
+                keys.push(hot.to_ascii_lowercase());
+            }
+            if let Some(cold) = member.cold_key {
+                keys.push(cold.to_ascii_lowercase());
+            }
+
+            committee_participants.push(participant);
+            for key in keys {
+                committee_lookup.insert(key, index);
+            }
+        }
+
+        fn ensure_drep_participant(
+            identifier: &str,
+            participants: &mut Vec<DRepParticipation>,
+            lookup: &mut HashMap<String, usize>,
+        ) -> usize {
+            let key = identifier.to_ascii_lowercase();
+            if let Some(index) = lookup.get(&key) {
+                return *index;
+            }
+
+            let index = participants.len();
+            participants.push(DRepParticipation {
+                drep_id: identifier.to_string(),
+                given_name: None,
+                view: None,
+                hex: None,
+                has_profile: None,
+                has_voted: false,
+                vote: None,
+                voting_power: None,
+                tx_hash: None,
+                cert_index: None,
+                block_time: None,
+            });
+            lookup.insert(key, index);
+            index
+        }
+
+        fn ensure_pool_participant(
+            identifier: &str,
+            participants: &mut Vec<StakePoolParticipation>,
+            lookup: &mut HashMap<String, usize>,
+        ) -> usize {
+            let key = identifier.to_ascii_lowercase();
+            if let Some(index) = lookup.get(&key) {
+                return *index;
+            }
+
+            let index = participants.len();
+            participants.push(StakePoolParticipation {
+                pool_id: identifier.to_string(),
+                ticker: None,
+                name: None,
+                description: None,
+                homepage: None,
+                has_voted: false,
+                vote: None,
+                voting_power: None,
+                tx_hash: None,
+                cert_index: None,
+                block_time: None,
+            });
+            lookup.insert(key, index);
+            index
+        }
+
+        fn ensure_committee_participant(
+            identifier: &str,
+            participants: &mut Vec<CommitteeParticipation>,
+            lookup: &mut HashMap<String, usize>,
+        ) -> usize {
+            let key = identifier.to_ascii_lowercase();
+            if let Some(index) = lookup.get(&key) {
+                return *index;
+            }
+
+            let index = participants.len();
+            participants.push(CommitteeParticipation {
+                identifier: identifier.to_string(),
+                role: None,
+                hot_key: None,
+                cold_key: None,
+                expiry_epoch: None,
+                has_voted: false,
+                vote: None,
+                voting_power: None,
+                tx_hash: None,
+                cert_index: None,
+                block_time: None,
+            });
+            lookup.insert(key, index);
+            index
+        }
+
+        for record in &vote_records {
+            match record.voter_type.as_str() {
+                "drep" => {
+                    let idx = ensure_drep_participant(
+                        &record.voter_identifier,
+                        &mut drep_participants,
+                        &mut drep_lookup,
+                    );
+
+                    if let Some(participant) = drep_participants.get_mut(idx) {
+                        participant.has_voted = true;
+                        participant.vote = record.vote.clone();
+                        participant.voting_power = record.voting_power.clone();
+                        participant.tx_hash = record.tx_hash.clone();
+                        participant.cert_index = record.cert_index;
+                        participant.block_time = record.block_time;
+                    }
+                }
+                "spo" | "stake_pool" | "pool" => {
+                    let idx = ensure_pool_participant(
+                        &record.voter_identifier,
+                        &mut stake_pool_participants,
+                        &mut pool_lookup,
+                    );
+
+                    if let Some(participant) = stake_pool_participants.get_mut(idx) {
+                        participant.has_voted = true;
+                        participant.vote = record.vote.clone();
+                        participant.voting_power = record.voting_power.clone();
+                        participant.tx_hash = record.tx_hash.clone();
+                        participant.cert_index = record.cert_index;
+                        participant.block_time = record.block_time;
+                    }
+                }
+                "cc" | "committee" | "constitutional" => {
+                    let idx = ensure_committee_participant(
+                        &record.voter_identifier,
+                        &mut committee_participants,
+                        &mut committee_lookup,
+                    );
+
+                    if let Some(participant) = committee_participants.get_mut(idx) {
+                        participant.has_voted = true;
+                        participant.vote = record.vote.clone();
+                        participant.voting_power = record.voting_power.clone();
+                        participant.tx_hash = record.tx_hash.clone();
+                        participant.cert_index = record.cert_index;
+                        participant.block_time = record.block_time;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        drep_participants.sort_by(|a, b| {
+            let a_key = a
+                .given_name
+                .as_ref()
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_else(|| a.drep_id.to_ascii_lowercase());
+            let b_key = b
+                .given_name
+                .as_ref()
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_else(|| b.drep_id.to_ascii_lowercase());
+            a_key.cmp(&b_key)
+        });
+
+        stake_pool_participants.sort_by(|a, b| {
+            let a_key = a
+                .ticker
+                .as_ref()
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_else(|| a.pool_id.to_ascii_lowercase());
+            let b_key = b
+                .ticker
+                .as_ref()
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_else(|| b.pool_id.to_ascii_lowercase());
+            a_key.cmp(&b_key)
+        });
+
+        committee_participants.sort_by(|a, b| a.identifier.cmp(&b.identifier));
+
+        let drep_voted = drep_participants.iter().filter(|p| p.has_voted).count();
+        let stake_pool_voted = stake_pool_participants
+            .iter()
+            .filter(|p| p.has_voted)
+            .count();
+        let committee_voted = committee_participants
+            .iter()
+            .filter(|p| p.has_voted)
+            .count();
+
+        let participation = ActionVoterParticipation {
+            dreps: ParticipationGroup {
+                summary: calculate_summary(&drep_participants, drep_voted),
+                participants: drep_participants,
+            },
+            stake_pools: ParticipationGroup {
+                summary: calculate_summary(&stake_pool_participants, stake_pool_voted),
+                participants: stake_pool_participants,
+            },
+            committee: ParticipationGroup {
+                summary: calculate_summary(&committee_participants, committee_voted),
+                participants: committee_participants,
+            },
+        };
+
+        self.cache.set(&cache_key, &participation).await;
+
+        Ok(participation)
+    }
+
     async fn enrich_action_with_epoch_times(
         &self,
         mut action: GovernanceAction,

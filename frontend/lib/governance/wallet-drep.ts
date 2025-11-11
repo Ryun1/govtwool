@@ -1,19 +1,25 @@
-/**
- * Wallet DRep utilities
- * 
- * Functions to derive DRep ID from stake key and check DRep registration status
- */
+import type { BrowserWallet } from '@meshsdk/core';
+import type { ConnectedWallet } from '@/lib/api/mesh';
+import type { DRep } from '@/types/governance';
 
-// Use Mesh SDK wallet.getDRep() for DRep ID derivation
+type WalletWithGovernance = {
+  getDRep: () => Promise<{ dRepIDCip105?: string } | null>;
+};
 
-/**
- * Derive DRep ID using Mesh SDK wallet.getDRep()
- * @param wallet - Mesh SDK wallet instance (must be connected)
- * @returns Promise<string | undefined> - DRep ID in CIP-105 format (drep1...)
- */
-export async function getDRepIdFromWallet(wallet: any): Promise<string | undefined> {
+const hasGetDRep = (wallet: unknown): wallet is WalletWithGovernance =>
+  typeof wallet === 'object' &&
+  wallet !== null &&
+  typeof (wallet as Partial<WalletWithGovernance>).getDRep === 'function';
+
+type BrowserWalletWithCip95 = BrowserWallet & {
+  cip95?: unknown;
+};
+
+export async function getDRepIdFromWallet(
+  wallet: BrowserWallet | WalletWithGovernance
+): Promise<string | undefined> {
   try {
-    if (!wallet || typeof wallet.getDRep !== 'function') {
+    if (!hasGetDRep(wallet)) {
       throw new Error('wallet.getDRep() is not available');
     }
     const dRep = await wallet.getDRep();
@@ -31,12 +37,15 @@ export async function getDRepIdFromWallet(wallet: any): Promise<string | undefin
  * @param apiBaseUrl - Base URL for the backend API (optional, defaults to /api)
  * @returns DRep object if registered, null if not registered
  */
-export async function checkDRepRegistration(drepId: string, apiBaseUrl: string = '/api'): Promise<any | null> {
+export async function checkDRepRegistration(
+  drepId: string,
+  apiBaseUrl: string = '/api'
+): Promise<DRep | null> {
   try {
     const response = await fetch(`${apiBaseUrl}/dreps/${drepId}`);
     
     if (response.ok) {
-      const drep = await response.json();
+      const drep: DRep = await response.json();
       // Check if DRep is actually registered (not retired or expired)
       if (drep.active || drep.status === 'active') {
         return drep;
@@ -57,12 +66,28 @@ export async function checkDRepRegistration(drepId: string, apiBaseUrl: string =
  * @param apiBaseUrl - Base URL for the backend API (optional, defaults to /api)
  * @returns DRep metadata if available, null otherwise
  */
-export async function getDRepMetadata(drepId: string, apiBaseUrl: string = '/api'): Promise<any | null> {
+export interface DRepMetadataResponse {
+  json_metadata?: {
+    body?: {
+      givenName?: string;
+      objectives?: string;
+      motivations?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export async function getDRepMetadata(
+  drepId: string,
+  apiBaseUrl: string = '/api'
+): Promise<DRepMetadataResponse | null> {
   try {
     const response = await fetch(`${apiBaseUrl}/dreps/${drepId}/metadata`);
     
     if (response.ok) {
-      const metadata = await response.json();
+      const metadata: DRepMetadataResponse = await response.json();
       return metadata;
     }
     
@@ -83,8 +108,8 @@ export async function getDRepMetadata(drepId: string, apiBaseUrl: string = '/api
  * @returns DRep ID that the stake address is delegated to, or null if not delegated
  */
 export async function getWalletDelegation(
-  stakeAddress: string, 
-  connectedWallet?: any
+  stakeAddress: string,
+  connectedWallet?: ConnectedWallet
 ): Promise<string | null> {
   try {
     // Try wallet API first (if wallet supports governance)
@@ -92,7 +117,7 @@ export async function getWalletDelegation(
       try {
         // Some wallets may support getting delegation info
         // This is wallet-specific and may not be available
-        const wallet = connectedWallet.wallet;
+        const wallet = connectedWallet.wallet as BrowserWalletWithCip95;
         
         // Check if wallet has governance methods (CIP-95)
         if (typeof wallet.cip95 !== 'undefined') {

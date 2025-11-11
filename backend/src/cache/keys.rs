@@ -31,6 +31,9 @@ pub enum CacheKey {
     ActionVotes {
         id: String,
     },
+    ActionParticipation {
+        id: String,
+    },
     ActionMetadataValidation {
         action_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,6 +73,7 @@ impl CacheKey {
             }
             CacheKey::Action { id } => format!("action:{}", id),
             CacheKey::ActionVotes { id } => format!("action_votes:{}", id),
+            CacheKey::ActionParticipation { id } => format!("action_participation:{}", id),
             CacheKey::ActionMetadataValidation {
                 action_id,
                 meta_hash,
@@ -118,6 +122,7 @@ impl CacheKey {
             CacheKey::ActionMetadataValidation { .. } => 600,
             // Action votes: 180 seconds
             CacheKey::ActionVotes { .. } => 180,
+            CacheKey::ActionParticipation { .. } => 180,
             // Stake delegation: 60 seconds
             CacheKey::StakeDelegation { .. } => 60,
             // Epoch start times: 1 hour
