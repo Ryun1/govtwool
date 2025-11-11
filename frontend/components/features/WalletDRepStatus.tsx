@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { CheckCircle2, XCircle, ExternalLink, User, AlertCircle } from 'lucide-react';
-import { getDRepIdFromWallet, checkDRepRegistration, getDRepMetadata, getWalletDelegation } from '@/lib/governance/wallet-drep';
+import {
+  getDRepIdFromWallet,
+  checkDRepRegistration,
+  getDRepMetadata,
+  getWalletDelegation,
+  type DRepMetadataResponse,
+} from '@/lib/governance/wallet-drep';
 import type { DRep } from '@/types/governance';
 import type { ConnectedWallet } from '@/lib/api/mesh';
 import Link from 'next/link';
@@ -19,10 +25,10 @@ export default function WalletDRepStatus({ stakeAddress, connectedWallet }: Wall
   const [drepId, setDrepId] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [drepInfo, setDrepInfo] = useState<DRep | null>(null);
-  const [metadata, setMetadata] = useState<any>(null);
+  const [metadata, setMetadata] = useState<DRepMetadataResponse['json_metadata'] | null>(null);
   const [delegatedTo, setDelegatedTo] = useState<string | null>(null);
   const [delegatedDRepInfo, setDelegatedDRepInfo] = useState<DRep | null>(null);
-  const [delegatedDRepMetadata, setDelegatedDRepMetadata] = useState<any>(null);
+  const [delegatedDRepMetadata, setDelegatedDRepMetadata] = useState<DRepMetadataResponse['json_metadata'] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [delegationLoading, setDelegationLoading] = useState(true);
 

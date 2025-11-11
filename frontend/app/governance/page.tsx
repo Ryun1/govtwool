@@ -147,7 +147,7 @@ export default function GovernancePage() {
           });
         }
       } catch (error) {
-        if ((error as any)?.name !== 'AbortError') {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
           console.error('Error loading DReps:', error);
         }
       } finally {
@@ -206,8 +206,12 @@ export default function GovernancePage() {
       }
       
       setTxHash(txHash);
-    } catch (error: any) {
-      setError(error.message || `Failed to ${currentAction} DRep`);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : `Failed to ${currentAction} DRep`;
+      setError(message);
     } finally {
       setBuilding(false);
     }

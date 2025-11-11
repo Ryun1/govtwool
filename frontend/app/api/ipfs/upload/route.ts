@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import type { DRepMetadata } from '@/types/governance';
 
 type IpfsProvider = 'pinata' | 'blockfrost';
 
 interface UploadRequest {
-  metadata: any;
+  metadata: unknown;
   provider: IpfsProvider;
   apiKey: string;
+}
+
+function isDRepMetadata(value: unknown): value is DRepMetadata {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const metadata = value as Partial<DRepMetadata>;
+  const body = metadata.body;
+
+  if (!body || typeof body !== 'object') {
+    return false;
+  }
+
+  return typeof (body as Record<string, unknown>).givenName === 'string';
 }
 
 /**
@@ -106,7 +122,7 @@ export async function POST(request: NextRequest) {
  * Upload to Pinata using their API
  * Documentation: https://docs.pinata.cloud/frameworks/next-js
  */
-async function uploadToPinata(metadata: any, jwt: string): Promise<string> {
+async function uploadToPinata(metadata: DRepMetadata, jwt: string): Promise<string> {
   try {
     console.log('🔍 [Pinata] Starting upload process...');
     
@@ -118,11 +134,14 @@ async function uploadToPinata(metadata: any, jwt: string): Promise<string> {
     }
     
     console.log('✓ [Pinata] JWT format validated');
+    const metadataBody = metadata.body as Record<string, unknown> | undefined;
+    const givenName =
+      typeof metadataBody?.givenName === 'string' ? metadataBody.givenName : 'Unknown DRep';
     console.log('📝 [Pinata] Metadata preview:', {
-      givenName: metadata.body?.givenName,
-      hasObjectives: !!metadata.body?.objectives,
-      hasMotivations: !!metadata.body?.motivations,
-      hasReferences: !!metadata.body?.references?.length,
+      givenName,
+      hasObjectives: Boolean(metadataBody?.objectives),
+      hasMotivations: Boolean(metadataBody?.motivations),
+      hasReferences: Array.isArray(metadataBody?.references) && metadataBody.references.length > 0,
     });
 
     // Use Pinata's JSON endpoint which works better with Node.js
@@ -130,7 +149,7 @@ async function uploadToPinata(metadata: any, jwt: string): Promise<string> {
     const pinataContent = {
       pinataContent: metadata,
       pinataMetadata: {
-        name: `DRep Metadata - ${metadata.body.givenName}`,
+        name: `DRep Metadata - ${givenName}`,
       },
     };
     
@@ -211,7 +230,7 @@ async function uploadToPinata(metadata: any, jwt: string): Promise<string> {
  * Upload to Blockfrost IPFS
  * Documentation: https://blockfrost.dev/start-building/ipfs/
  */
-async function uploadToBlockfrost(metadata: any, projectId: string): Promise<string> {
+async function uploadToBlockfrost(metadata: DRepMetadata, projectId: string): Promise<string> {
   try {
     // Convert metadata to a Blob
     const blob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
