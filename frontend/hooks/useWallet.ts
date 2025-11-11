@@ -17,13 +17,29 @@ export function useWallet() {
       console.log('[wallet] useWallet availableWallets:', wallets);
       setAvailableWallets(wallets);
       
-      // Check for persisted wallet connection
+      // Check for persisted wallet connection and auto-reconnect
       const savedWallet = localStorage.getItem('connectedWallet');
       if (savedWallet) {
         try {
           const walletData = JSON.parse(savedWallet);
           console.log('[wallet] found persisted wallet preference:', walletData);
-          // Note: Wallet connection needs to be re-established on page load
+          
+          // Auto-reconnect the saved wallet
+          if (walletData?.name && wallets.includes(walletData.name)) {
+            console.log('[wallet] auto-reconnecting wallet:', walletData.name);
+            connectWallet(walletData.name).then(wallet => {
+              if (wallet) {
+                setConnectedWallet(wallet);
+                console.log('[wallet] auto-reconnect success');
+              } else {
+                console.warn('[wallet] auto-reconnect failed, clearing saved wallet');
+                localStorage.removeItem('connectedWallet');
+              }
+            }).catch(err => {
+              console.error('[wallet] auto-reconnect error:', err);
+              localStorage.removeItem('connectedWallet');
+            });
+          }
         } catch (error) {
           console.warn('[wallet] failed to parse persisted wallet preference, clearing', error);
           localStorage.removeItem('connectedWallet');

@@ -87,37 +87,38 @@ export function MetadataValidationSummary({ checks, metaUrl }: MetadataValidatio
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 md:grid-cols-3">
-          {summaryOrder.map(({ key, title, description }) => {
-            const outcome = checks[key] as MetadataCheckOutcome;
-            const config = statusConfig[outcome.status];
-            const Icon = config.icon;
+            {summaryOrder.map(({ key, title, description }) => {
+              const outcome = checks[key] as MetadataCheckOutcome | undefined;
+              const status = outcome?.status ?? 'unknown';
+              const config = statusConfig[status];
+              const Icon = config.icon;
 
-            return (
-              <div
-                key={key}
-                className={cn(
-                  'rounded-lg border p-4 transition-colors',
-                  outcome.status === 'fail' && 'border-destructive/40 bg-destructive/5',
-                  outcome.status === 'pass' && 'border-green-500/40 bg-green-500/5',
-                  outcome.status === 'pending' && 'border-blue-500/30 bg-blue-500/5'
-                )}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    <span className="font-medium text-sm">{title}</span>
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'rounded-lg border p-4 transition-colors',
+                    status === 'fail' && 'border-destructive/40 bg-destructive/5',
+                    status === 'pass' && 'border-green-500/40 bg-green-500/5',
+                    status === 'pending' && 'border-blue-500/30 bg-blue-500/5'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      <span className="font-medium text-sm">{title}</span>
+                    </div>
+                    <Badge variant={config.variant} className="min-w-[80px] justify-center">
+                      {config.label}
+                    </Badge>
                   </div>
-                  <Badge variant={config.variant} className="min-w-[80px] justify-center">
-                    {config.label}
-                  </Badge>
+                  <p className="text-xs text-muted-foreground">{description}</p>
+                  {outcome?.message && (
+                    <p className="mt-2 text-xs text-foreground">{outcome.message}</p>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">{description}</p>
-                {outcome.message && (
-                  <p className="mt-2 text-xs text-foreground">{outcome.message}</p>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
 
         {checks.notes && checks.notes.length > 0 && (
