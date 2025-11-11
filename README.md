@@ -1,67 +1,91 @@
-# govtwool -- 2025 summit hackathon entry
+# govtWool 🐏 -- 2025 LayerUp hackathon entry
 
-Team insects entry for the 2025 LayerUp hackathon -- Gov**Two**ol (get it?)
+Team insects entry for the 2025 LayerUp hackathon -- Gov**tWo**ol (get it?)
 
-## Why did we build this?
+We have it hosted here: [govtwool.vercel.app](https://govtwool.vercel.app/) (using Preview testnet)
 
-- There are some cool features and standards which existing governance tooling has not implemented
-- We felt we have experience in governance tools, and could produce something okay in the time
+## Motivation
 
-### Nice features
+There are a few fully featured governance interface tools in the ecosystem.
+There has been a lot of community feedback on these tools.
 
-These are features of GovtWool
-which are not widely present in current governance tooling offerings.
+We wanted to build a new governance interface tool,
+which *hopefully* addresses some of the community feedback.
 
-- Sheep theme
-- Night mode / light mode
-- Overall tried to provide a lot of information in an approachable way
+Additionally, we wanted a tool we could use to quickly implement newer governance
+standards or ideas, to test them out.
+
+### Why Us?
+
+We have experience using and building Cardano governance tools.
+
+### Aims for the project
+
+Build a governance interface tool which;
+
+- offers strong UI UX -- the governance model is complex, we want to present it in an approachable way
+- is fully featured -- offers full support for browsing governance data, DRep and Ada holder interactions
+- offers newer governance standards -- new standards are proposed but lacking adoption i.e. [CIP-149](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0149), [CIP-169?](https://github.com/cardano-foundation/CIPs/pull/1101)
+
+### Features
+
+#### Key Features
+
+- Wooly theme
+- CIP-169
+- Global search
 
 #### Governance Action Explorer
 
 - Differentiates 'budget' governance actions from Info actions
-- Detailed voting summary
-- Detailed metadata validation summary
+- Detailed voting tally summary
+- Detailed metadata validation
   - hash checks
-  - warning if author not using ipfs
+  - warning if author not using IPFS to host metadata
   - author witness validation
-  - CIP-0169 | On-chain effects implementation
-- voter participation tab with export
+  - CIP-0169? | On-chain effects implementation
+- Detailed voter participation tab with export to CSV
 
 #### DRep Directory
 
+- Full DRep metadata rendering
 - Voting and delegator history
 
-### Bad bits
+#### Governance Interaction
 
-- Data sources, we are getting data from like three different sources, this is annoying and bad.
+- Wallet connect
+- DRep registration
+- DRep Update
+- DRep retirement
+- Vote delegation
 
-## Access
+### Features we would like to add
 
-For ease, we have hosted it at
-- https://govtwool.vercel.app
-
-Using Render to host the backend.
+- Properly connect all DRep and governance action filters
+- Create a custom backend to stop reliance on data services
+- Deep governance analytics
 
 ## Tech Stack
 
-**Frontend**
-- Next.js 16 (App Router) with TypeScript
+### Frontend
+
+- Next.js 16 with TypeScript
 - Tailwind CSS + custom component primitives
 - Mesh SDK for wallet connectivity and transaction building
 - Recharts & bespoke visualizations for governance data
 - Framer Motion for premium interactions
 
-**Backend**
+### Backend
+
 - Rust (Axum + Tokio) service with layered provider abstraction
 - Integrations with Blockfrost, Koios, and GovTools APIs
 - Moka-powered caching and provider failover strategy
-- Flexible deployment via Render, Railway, or any standard Rust host
 
 ## Setup
 
 ### Prerequisites
 
-- **Node.js 20.9.0+** (Next.js 16 requires Node 20.9.0 or newer; Node 22 LTS recommended)
+- **Node.js 20.9.0+**
 - **Rust 1.75+** with `cargo` (install via [rustup.rs](https://rustup.rs))
 - A **Blockfrost API key** for Cardano network access
 
@@ -77,37 +101,24 @@ cd govtwool
 ```bash
 cd frontend
 npm install
-
-# Optional - create .env.local
-cat <<'EOF' > .env.local
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
-NEXT_PUBLIC_NETWORK=preview
-EOF
-
-npm run dev
 ```
 
-The frontend defaults to `http://localhost:8080` if `NEXT_PUBLIC_BACKEND_URL` is not set, so the `.env.local` step is optional for local work.
+Fill in your `.env`, you can use the example.
+
+```bash
+npm run dev
+```
 
 #### Backend (`backend/`)
 
 ```bash
 cd backend
-cargo fetch  # optional warm-up
+cargo fetch
+```
 
-cat <<'EOF' > .env
-BLOCKFROST_API_KEY=your_blockfrost_project_id_here
-BLOCKFROST_NETWORK=preview
-KOIOS_BASE_URL=https://preview.koios.rest/api/v1
-GOVTOOLS_BASE_URL=https://be.preview.gov.tools
-GOVTOOLS_ENABLED=true
-CARDANO_VERIFIER_ENABLED=false
-CARDANO_VERIFIER_ENDPOINT=https://verifycardanomessage.cardanofoundation.org/api/verify-cip100
-CACHE_ENABLED=true
-CACHE_MAX_ENTRIES=10000
-BACKEND_PORT=8080
-EOF
+Fill in your `.env`, you can use the example.
 
+```
 cargo run
 ```
 
@@ -117,10 +128,3 @@ Environment variables such as `BLOCKFROST_API_KEY`, `GOVTOOLS_ENABLED`, and `COR
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8080 (see `backend/API.md` for endpoints)
-
-### Production Builds
-
-- **Frontend:** `cd frontend && npm run build && npm run start`
-- **Backend:** `cd backend && cargo build --release && ./target/release/govtwool-backend`
-
-Refer to `docs/DEPLOYMENT_SETUP.md` for Render + Vercel CI/CD guidance.
