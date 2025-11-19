@@ -1,15 +1,16 @@
 # GovTwool Backend
 
-Rust backend service that abstracts Cardano data provider complexity (Blockfrost and Koios) behind a unified REST API.
+Rust backend service that provides a unified REST API for Cardano governance data using Yaci Store indexer.
 
 ## Features
 
-- **Provider Abstraction**: Unified interface for Blockfrost, Koios, and GovTools APIs (mainnet & preview)
-- **Smart Routing**: Automatically selects the best provider for each operation type
-- **Automatic Fallback**: Gracefully falls back to alternative providers on failure
+- **Self-Hosted Indexer**: Uses Yaci Store for blockchain indexing (no dependency on external APIs)
+- **PostgreSQL Database**: Direct database queries for high performance
 - **Type Safety**: Strong typing with Rust's type system
-- **High Performance**: Async runtime with Tokio
-- **Stake Insights**: Unified stake delegation endpoint with pool, DRep, and balance data
+- **High Performance**: Async runtime with Tokio and connection pooling
+- **Caching**: In-memory caching layer for frequently accessed data
+- **Metadata Validation**: Optional Cardano Verifier API integration
+- **DRep Enrichment**: Optional GovTools integration for enhanced DRep metadata
 
 ## Setup
 
@@ -17,6 +18,8 @@ Rust backend service that abstracts Cardano data provider complexity (Blockfrost
 
 - **Rust 1.70+** (stable toolchain)
 - **Cargo** (comes with Rust)
+- **PostgreSQL Database**: Yaci Store database must be running and accessible
+- **Yaci Store Indexer**: Must be running and synced (see `../indexer/README.md`)
 
 ### Installation
 
@@ -25,31 +28,33 @@ Rust backend service that abstracts Cardano data provider complexity (Blockfrost
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-2. Create a `.env` file in `backend/` with the required configuration:
+2. Ensure Yaci Store indexer is running and database is accessible (see `../indexer/README.md`)
+
+3. Create a `.env` file in `backend/` with the required configuration:
 ```env
-BLOCKFROST_API_KEY=your_blockfrost_project_id_here
-BLOCKFROST_NETWORK=preview
-KOIOS_BASE_URL=https://preview.koios.rest/api/v1
-GOVTOOLS_BASE_URL=https://be.gov.tools
-GOVTOOLS_ENABLED=false
+# Required: Database connection
+DATABASE_URL=postgresql://postgres:password@localhost:5432/yaci_store
+
+# Optional: Server configuration
+PORT=8080
 CACHE_ENABLED=true
 CACHE_MAX_ENTRIES=10000
-BACKEND_PORT=8080
-# Optional: CORS_ORIGINS=https://app.yourdomain.com,https://staging.yourdomain.com
+
+# Optional: GovTools enrichment
+GOVTOOLS_ENABLED=false
+GOVTOOLS_BASE_URL=https://be.preview.gov.tools
+
+# Optional: Metadata validation
+CARDANO_VERIFIER_ENABLED=false
 ```
 
-3. Adjust values as needed:
-   - `BLOCKFROST_API_KEY`: Required Blockfrost project ID
-   - `BLOCKFROST_NETWORK`: `mainnet`, `preview`, or `preprod` (defaults to `mainnet` if unset)
-   - `KOIOS_BASE_URL`: Koios API base URL (defaults to https://preview.koios.rest/api/v1)
-   - `GOVTOOLS_BASE_URL`: GovTools enrichment API (defaults to https://be.gov.tools)
-   - `GOVTOOLS_ENABLED`: Toggle GovTools enrichment (`true`/`false`, **auto-disabled for non-mainnet**)
-   - `CACHE_ENABLED`: Toggle in-memory caching (`true`/`false`, default `true`)
+4. See `.env.example` for all available configuration options:
+   - `DATABASE_URL`: PostgreSQL connection string (required)
+   - `PORT`: Server port (defaults to `8080`)
+   - `CACHE_ENABLED`: Toggle in-memory caching (default `true`)
    - `CACHE_MAX_ENTRIES`: Cache size limit (default `10000`)
-   - `BACKEND_PORT`: Server port for local runs (defaults to `8080`; Render sets `PORT`)
-   - `CORS_ORIGINS`: Comma-separated list of allowed origins (optional; wildcard by default)
-
-> **⚠️ Network Note:** GovTools currently supports mainnet and preview. The backend auto-selects `https://be.gov.tools` for mainnet and `https://be.preview.gov.tools` for preview; other networks default to disabled unless you explicitly configure `GOVTOOLS_ENABLED=true` and provide a `GOVTOOLS_BASE_URL`.
+   - `GOVTOOLS_ENABLED`: Toggle GovTools enrichment (default `false`)
+   - `CARDANO_VERIFIER_ENABLED`: Toggle metadata validation (default `false`)
 
 > **Note:** The current CORS configuration allows all origins when no override is provided. Fine-grained origin control will honour `CORS_ORIGINS` as the gateway hardening work progresses.
 
@@ -89,19 +94,17 @@ For detailed API documentation, see [API.md](./API.md).
 **Health Check:**
 - `GET /health` - Health check endpoint with cache statistics
 
-## Provider Routing Strategy
+## Architecture
 
-The backend implements smart routing with automatic fallback:
+The backend queries Yaci Store's PostgreSQL database directly for all governance data:
 
-- **DRep list**: Tries Koios first (faster bulk queries), falls back to Blockfrost
-- **DRep details**: Uses Blockfrost (more complete metadata)
-- **DRep delegators**: Tries Koios first (specialized endpoint), falls back to Blockfrost
-- **DRep voting history**: Tries Koios first (specialized endpoint), falls back to Blockfrost
-- **Governance actions list**: Tries Koios first, falls back to Blockfrost
-- **Governance action details**: Uses Blockfrost (more complete)
-- **Voting results**: Tries Koios first (specialized), falls back to Blockfrost
-- **Active DReps count**: Uses Koios epoch summary
-- **Stake delegation lookups**: Tries Koios first, falls back to Blockfrost
+- **DRep Data**: Queries `drep_registration` table
+- **Governance Actions**: Queries `governance_action` table
+- **Votes**: Queries `vote` table with joins to governance actions
+- **Stake Delegations**: Queries `stake_delegation` and `stake_address` tables
+- **Epoch Data**: Queries `epoch` table for epoch start times
+
+All queries are optimized with proper indexing and connection pooling.
 
 ## Architecture
 
@@ -110,14 +113,18 @@ backend/
 ├── src/
 │   ├── main.rs          # Server entry point
 │   ├── config.rs        # Configuration management
+│   ├── db/              # Database layer
+│   │   ├── mod.rs       # Database connection pool
+│   │   └── queries.rs   # SQL queries
 │   ├── api/             # REST API handlers
 │   │   ├── dreps.rs
 │   │   ├── actions.rs
 │   │   └── health.rs
 │   ├── providers/       # Provider abstraction layer
-│   │   ├── blockfrost.rs
-│   │   ├── koios.rs
-│   │   └── router.rs    # Smart routing logic
+│   │   ├── yaci_store.rs        # Yaci Store provider
+│   │   ├── yaci_store_router.rs # Yaci Store router
+│   │   ├── cached_router.rs     # Caching wrapper
+│   │   └── router_trait.rs     # Router trait
 │   ├── models/          # Data models
 │   │   ├── drep.rs
 │   │   ├── action.rs

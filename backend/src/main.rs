@@ -1,6 +1,7 @@
 mod api;
 mod cache;
 mod config;
+mod db;
 mod models;
 mod providers;
 mod services;
@@ -9,8 +10,9 @@ mod utils;
 use axum::{routing::get, Router};
 use cache::CacheManager;
 use config::Config;
+use db::Database;
 use providers::{
-    BlockfrostProvider, CachedProviderRouter, GovToolsProvider, KoiosProvider, ProviderRouter,
+    CachedProviderRouter, GovToolsProvider, YaciStoreProvider, YaciStoreRouter,
 };
 use services::metadata_validation::VerifierConfig;
 use std::net::SocketAddr;
@@ -31,11 +33,15 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let config = Config::from_env()?;
 
-    let blockfrost_base_url = config.blockfrost_base_url();
-    let blockfrost_provider =
-        BlockfrostProvider::new(blockfrost_base_url, config.blockfrost_api_key);
-    let koios_provider = KoiosProvider::new(config.koios_base_url.clone());
-    let provider_router = ProviderRouter::new(blockfrost_provider, koios_provider);
+    // Initialize database connection
+    tracing::info!("Connecting to database...");
+    let database = Database::new(&config.database_url).await?;
+    tracing::info!("Database connection established");
+
+    // Initialize Yaci Store provider
+    let yaci_store_provider = YaciStoreProvider::new(database);
+    let provider_router = YaciStoreRouter::new(yaci_store_provider);
+
     let govtools_provider = if config.govtools_enabled {
         tracing::info!(
             "GovTools enabled for network: {} (base URL: {})",

@@ -3,12 +3,18 @@ pub mod cached_router;
 pub mod govtools;
 pub mod koios;
 pub mod router;
+pub mod router_trait;
+pub mod yaci_store;
+pub mod yaci_store_router;
 
 pub use blockfrost::BlockfrostProvider;
 pub use cached_router::CachedProviderRouter;
 pub use govtools::{GovToolsEnrichment, GovToolsProvider};
 pub use koios::KoiosProvider;
 pub use router::ProviderRouter;
+pub use router_trait::Router;
+pub use yaci_store::YaciStoreProvider;
+pub use yaci_store_router::YaciStoreRouter;
 
 use crate::models::*;
 use async_trait::async_trait;
