@@ -1,6 +1,6 @@
 services:
   # PostgreSQL Database for Yaci Store
-  - type: pspg
+  - type: postgresql
     name: govtwool-database
     plan: starter
     databaseName: yaci_store
