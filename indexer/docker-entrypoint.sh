@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Ensure JDBC URL has jdbc: prefix (Render connectionString may not include it)
+if [ -n "$SPRING_DATASOURCE_URL" ]; then
+    if [[ ! "$SPRING_DATASOURCE_URL" =~ ^jdbc: ]]; then
+        # Add jdbc: prefix if missing
+        export SPRING_DATASOURCE_URL="jdbc:${SPRING_DATASOURCE_URL}"
+        echo "Added jdbc: prefix to SPRING_DATASOURCE_URL"
+    fi
+fi
+
 # Generate application.properties from environment variables
 cat > /app/application.properties << 'PROPERTIES_EOF'
 # Generated from environment variables at runtime
