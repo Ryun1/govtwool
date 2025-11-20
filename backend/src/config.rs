@@ -3,9 +3,14 @@ use std::env;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub server_port: u16,
-    pub blockfrost_api_key: String,
+    pub database_url: String,
+    // Legacy fields - kept for backward compatibility during migration
+    #[allow(dead_code)]
+    pub blockfrost_api_key: Option<String>,
+    #[allow(dead_code)]
     pub blockfrost_network: String,
-    pub koios_base_url: String,
+    #[allow(dead_code)]
+    pub koios_base_url: Option<String>,
     #[allow(dead_code)]
     pub cors_origins: Vec<String>,
     pub cache_enabled: bool,
@@ -45,11 +50,21 @@ impl Config {
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
                 .unwrap_or(8080),
-            blockfrost_api_key: env::var("BLOCKFROST_API_KEY")
-                .map_err(|_| anyhow::anyhow!("BLOCKFROST_API_KEY not set"))?,
+            database_url: env::var("DATABASE_URL")
+                .or_else(|_| {
+                    // Fallback to constructing from individual components
+                    let host = env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
+                    let port = env::var("DB_PORT").unwrap_or_else(|_| "5432".to_string());
+                    let name = env::var("DB_NAME").unwrap_or_else(|_| "yaci_store".to_string());
+                    let user = env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
+                    let password = env::var("DB_PASSWORD")
+                        .map_err(|_| anyhow::anyhow!("DATABASE_URL or DB_PASSWORD not set"))?;
+                    Ok(format!("postgresql://{}:{}@{}:{}/{}", user, password, host, port, name))
+                })
+                .map_err(|e: anyhow::Error| anyhow::anyhow!("Database configuration error: {}", e))?,
+            blockfrost_api_key: env::var("BLOCKFROST_API_KEY").ok(),
             blockfrost_network: blockfrost_network.clone(),
-            koios_base_url: env::var("KOIOS_BASE_URL")
-                .unwrap_or_else(|_| "https://preview.koios.rest/api/v1".to_string()),
+            koios_base_url: env::var("KOIOS_BASE_URL").ok(),
             cors_origins: env::var("CORS_ORIGINS")
                 .unwrap_or_else(|_| "http://localhost:3000".to_string())
                 .split(',')
