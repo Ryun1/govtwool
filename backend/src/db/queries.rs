@@ -228,3 +228,74 @@ pub async fn get_epoch_start_time(pool: &PgPool, epoch: u32) -> Result<Option<u6
     Ok(None)
 }
 
+// Yaci Store sync status queries
+pub struct SyncStatus {
+    pub connected: bool,
+    pub latest_block_number: Option<i64>,
+    pub latest_block_slot: Option<i64>,
+    pub latest_block_time: Option<i64>,
+    pub total_blocks: Option<i64>,
+    pub latest_epoch: Option<i32>,
+    pub sync_progress: Option<String>,
+}
+
+pub async fn get_yaci_sync_status(pool: &PgPool) -> Result<SyncStatus> {
+    // Check database connection
+    let connected = sqlx::query("SELECT 1")
+        .execute(pool)
+        .await
+        .is_ok();
+    
+    // Get latest block information
+    let latest_block = sqlx::query_as::<_, (Option<i64>, Option<i64>, Option<i64>)>(
+        "SELECT number, slot, block_time FROM block ORDER BY number DESC LIMIT 1"
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+    
+    let (latest_block_number, latest_block_slot, latest_block_time) = latest_block.unwrap_or((None, None, None));
+    
+    // Get total block count
+    let total_blocks = sqlx::query_as::<_, (Option<i64>,)>(
+        "SELECT COUNT(*)::bigint FROM block"
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .map(|(count,)| count);
+    
+    // Get latest epoch
+    let latest_epoch = sqlx::query_as::<_, (Option<i32>,)>(
+        "SELECT MAX(epoch_no) FROM epoch"
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .map(|(epoch,)| epoch);
+    
+    // Determine sync status
+    let sync_progress = if let (Some(block_num), Some(total)) = (latest_block_number, total_blocks) {
+        if total > 0 {
+            Some(format!("Block {} of {} synced", block_num, total))
+        } else {
+            Some("Initializing...".to_string())
+        }
+    } else {
+        Some("Not synced yet".to_string())
+    };
+    
+    Ok(SyncStatus {
+        connected,
+        latest_block_number,
+        latest_block_slot,
+        latest_block_time,
+        total_blocks,
+        latest_epoch,
+        sync_progress,
+    })
+}
+

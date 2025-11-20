@@ -112,7 +112,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .layer(TraceLayer::new_for_http())
                 .layer(cors),
         )
-        .with_state(router);
+        .with_state((router, database));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
     tracing::info!("Starting server on http://{}", addr);

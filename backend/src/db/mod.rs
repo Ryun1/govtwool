@@ -4,6 +4,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
 use anyhow::Result;
 
+#[derive(Clone)]
 pub struct Database {
     pool: PgPool,
 }
@@ -29,6 +30,10 @@ impl Database {
             .await
             .map(|_| true)
             .map_err(|e| anyhow::anyhow!("Database health check failed: {}", e))
+    }
+    
+    pub async fn get_sync_status(&self) -> Result<queries::SyncStatus> {
+        queries::get_yaci_sync_status(self.pool()).await
     }
 }
 
