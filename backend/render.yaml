@@ -2,17 +2,41 @@ services:
   - type: web
     name: govtwool-backend
     env: rust
+    region: oregon
+    rootDir: backend
     buildCommand: cargo build --release
     startCommand: ./target/release/govtwool-backend
+    healthCheckPath: /health
     envVars:
-      - key: BLOCKFROST_API_KEY
-        sync: false
-      - key: BLOCKFROST_NETWORK
-        value: mainnet
-      - key: KOIOS_BASE_URL
-        value: https://preview.koios.rest/api/v1
+      # Database Configuration (requires PostgreSQL service)
+      # Link to database service: DATABASE_URL will be auto-populated
+      - key: DATABASE_URL
+        sync: false  # Set manually or link to database service
+      - key: PORT
+        value: 8080
+      
+      # Cache Configuration
       - key: CACHE_ENABLED
         value: "true"
       - key: CACHE_MAX_ENTRIES
         value: "10000"
+      
+      # GovTools Configuration (optional)
+      - key: GOVTOOLS_ENABLED
+        value: "false"
+      - key: GOVTOOLS_BASE_URL
+        value: https://be.preview.gov.tools
+      
+      # CORS Configuration
+      - key: CORS_ORIGINS
+        value: "*"
+      
+      # Legacy Blockfrost/Koios (optional, not used with Yaci Store)
+      - key: BLOCKFROST_NETWORK
+        value: preview
+        sync: false
+      - key: BLOCKFROST_API_KEY
+        sync: false
+      - key: KOIOS_BASE_URL
+        sync: false
 

@@ -224,9 +224,9 @@ warning: associated function `new` is never used
    |            ^^^
 
 warning: `govtwool-backend` (bin "govtwool-backend") generated 35 warnings (run `cargo fix --bin "govtwool-backend"` to apply 1 suggestion)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
      Running `target/debug/govtwool-backend`
-[2m2025-11-19T21:45:14.898595Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m Connecting to database...
-[2m2025-11-19T21:45:15.011196Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m Database connection established
-[2m2025-11-19T21:45:15.011267Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m GovTools enabled for network: preview (base URL: https://be.preview.gov.tools)
-[2m2025-11-19T21:45:15.015684Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m Starting server on http://0.0.0.0:8080
+[2m2025-11-20T10:53:16.108341Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m Connecting to database...
+[2m2025-11-20T10:53:16.138307Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m Database connection established
+[2m2025-11-20T10:53:16.138373Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m GovTools enabled for network: preview (base URL: https://be.preview.gov.tools)
+[2m2025-11-20T10:53:16.142070Z[0m [32m INFO[0m [2mgovtwool_backend[0m[2m:[0m Starting server on http://0.0.0.0:8080
